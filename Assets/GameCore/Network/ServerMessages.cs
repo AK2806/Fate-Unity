@@ -1329,16 +1329,8 @@ namespace GameCore.Network.ServerMessages {
 		}
 	}
 
-	public sealed class StorySceneFinishNonRepeatAnimsMessage : Message {
+	public sealed class StorySceneCompleteAnimCommandsMessage : Message {
 		public const int MESSAGE_TYPE = -51;
-		public override int MessageType { get { return MESSAGE_TYPE; } }
-
-		public override void ReadFrom(IDataInputStream stream) { }
-		public override void WriteTo(IDataOutputStream stream) { }
-	}
-
-	public sealed class StorySceneFinishRepeatAnimsMessage : Message {
-		public const int MESSAGE_TYPE = -52;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
 		public override void ReadFrom(IDataInputStream stream) { }

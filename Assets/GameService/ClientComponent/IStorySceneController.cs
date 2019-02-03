@@ -13,13 +13,12 @@ namespace GameService.ClientComponent {
         void AddObject(int id, AssetReference[] spriteGroup);
         void RemoveObject(int id);
 
-        void ExecuteAnimations(Animation cameraAnimation, int[] ids, Animation[] animations);
-        void ExecuteAnimations(int[] ids, Animation[] animations);
-        void FinishNonRepeatAnimations();
-        void FinishRepeatAnimations();
+        void PlayAnimations(Animation cameraAnimation, int[] ids, Animation[] animations);
+        void PlayAnimations(int[] ids, Animation[] animations);
+        void CompleteAnimations();
         
-        void ClearObjectTouchListeners();
-        void SetObjectTouchListener(int id, Action<int> callback);
+        void ClearInvestigationListeners();
+        void SetInvestigationListener(int id, Action<int> callback);
 
         void EnabledInvestigationView();
         void DisableInvestigationView();

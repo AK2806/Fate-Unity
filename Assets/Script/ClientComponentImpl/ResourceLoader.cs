@@ -8,16 +8,12 @@ using GameCore;
 
 namespace ClientComponentImpl {
     public sealed class ResourceLoader : IResourceLoader {
-        public void Load(AssetReference res) {
+        public void AsyncReload(AssetReference[] resources) {
 
         }
 
-        public bool IsLoaded(AssetReference res) {
-            return false;
-        }
-
-        public void Release(AssetReference res) {
-
+        public float GetLoadingProgress() {
+            return 0.0f;
         }
     }
 }

@@ -30,8 +30,7 @@ namespace GameService.ServerProxy {
             connection.AddMessageReceiver(StorySceneDestroyObjectMessage.MESSAGE_TYPE, this);
             connection.AddMessageReceiver(StorySceneUpdateObjectDataMessage.MESSAGE_TYPE, this);
             connection.AddMessageReceiver(StorySceneExecuteAnimCommandsMessage.MESSAGE_TYPE, this);
-            connection.AddMessageReceiver(StorySceneFinishNonRepeatAnimsMessage.MESSAGE_TYPE, this);
-            connection.AddMessageReceiver(StorySceneFinishRepeatAnimsMessage.MESSAGE_TYPE, this);
+            connection.AddMessageReceiver(StorySceneCompleteAnimCommandsMessage.MESSAGE_TYPE, this);
             connection.AddMessageReceiver(StorySceneEnterStoryModeMessage.MESSAGE_TYPE, this);
             connection.AddMessageReceiver(StorySceneEnterTalkModeMessage.MESSAGE_TYPE, this);
             connection.AddMessageReceiver(StorySceneTurnTalkMessage.MESSAGE_TYPE, this);
@@ -42,7 +41,7 @@ namespace GameService.ServerProxy {
 
         public void InteractWithObject(int id) {
             if (_investigating) return;
-            _controller.FinishNonRepeatAnimations();
+            _controller.CompleteAnimations();
             var message = new StorySceneInvestigateObjectMessage();
             message.objID = IdentificationConverter.GetIdentification(_objectList[id]);
             ConnectionRef.SendMessage(message);
@@ -90,13 +89,12 @@ namespace GameService.ServerProxy {
                             _investigating = false;
                             _talker1 = _talker2 = null;
                             _controller.DisableTextInput();
-                            _controller.HideSelections();
                             _controller.ClearDialog();
-                            _controller.FinishNonRepeatAnimations();
-                            _controller.FinishRepeatAnimations();
-                            _controller.ClearObjectTouchListeners();
-                            _controller.ClearObjects();
+                            _controller.HideSelections();
                             _controller.DisableInvestigationView();
+                            _controller.ClearInvestigationListeners();
+                            _controller.CompleteAnimations();
+                            _controller.ClearObjects();
                         }
                         break;
                     case StorySceneCreateObjectMessage.MESSAGE_TYPE: {
@@ -119,12 +117,10 @@ namespace GameService.ServerProxy {
                             var msg = (StorySceneUpdateObjectDataMessage)message;
                             int id = IdentificationConverter.GetID(msg.objID);
                             _objectList[id].Interactable = msg.interactable;
-                            if (_investigating) {
-                                if (msg.interactable) {
-                                    _controller.SetObjectTouchListener(id, this.InteractWithObject);
-                                } else {
-                                    _controller.SetObjectTouchListener(id, null);
-                                }
+                            if (msg.interactable) {
+                                _controller.SetInvestigationListener(id, this.InteractWithObject);
+                            } else {
+                                _controller.SetInvestigationListener(id, null);
                             }
                         }
                         break;
@@ -145,18 +141,14 @@ namespace GameService.ServerProxy {
                             int[] ids = idList.ToArray();
                             Animation[] animations = animList.ToArray();
                             if (cameraAnimIdx != -1) {
-                                _controller.ExecuteAnimations(msg.animations[cameraAnimIdx], ids, animations);
+                                _controller.PlayAnimations(msg.animations[cameraAnimIdx], ids, animations);
                             } else {
-                                _controller.ExecuteAnimations(ids, animations);
+                                _controller.PlayAnimations(ids, animations);
                             }
                         }
                         break;
-                    case StorySceneFinishNonRepeatAnimsMessage.MESSAGE_TYPE: {
-                            _controller.FinishNonRepeatAnimations();
-                        }
-                        break;
-                    case StorySceneFinishRepeatAnimsMessage.MESSAGE_TYPE: {
-                            _controller.FinishRepeatAnimations();
+                    case StorySceneCompleteAnimCommandsMessage.MESSAGE_TYPE: {
+                            _controller.CompleteAnimations();
                         }
                         break;
                     case StorySceneEnterStoryModeMessage.MESSAGE_TYPE: {
@@ -165,7 +157,6 @@ namespace GameService.ServerProxy {
                             _talker2 = null;
                             _controller.DisableInvestigationView();
                             _controller.DisableTextInput();
-                            _controller.ClearObjectTouchListeners();
                         }
                         break;
                     case StorySceneEnterTalkModeMessage.MESSAGE_TYPE: {
@@ -180,7 +171,6 @@ namespace GameService.ServerProxy {
                             } else {
                                 _controller.DisableTextInput();
                             }
-                            _controller.ClearObjectTouchListeners();
                         }
                         break;
                     case StorySceneTurnTalkMessage.MESSAGE_TYPE: {
@@ -202,11 +192,6 @@ namespace GameService.ServerProxy {
                             } else {
                                 _investigating = false;
                                 _controller.DisableInvestigationView();
-                            }
-                            foreach (var obj in _objectList) {
-                                if (obj.Interactable) {
-                                    _controller.SetObjectTouchListener(obj.ID, this.InteractWithObject);
-                                }
                             }
                         }
                         break;

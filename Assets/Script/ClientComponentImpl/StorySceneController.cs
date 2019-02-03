@@ -69,20 +69,19 @@ namespace ClientComponentImpl.StoryScene {
             _imgDict[id] = data;
         }
         */
-        public void ExecuteAnimations(GameCore.StoryScene.Animation cameraAnimation, int[] ids, GameCore.StoryScene.Animation[] objectsAnim) {
+        public void PlayAnimations(GameCore.StoryScene.Animation cameraAnimation, int[] ids, GameCore.StoryScene.Animation[] objectsAnim) {
 
         }
 
-        public void ExecuteAnimations(int[] ids, GameCore.StoryScene.Animation[] objectsAnim) {
-            _gpc.Wait(-1);
+        public void PlayAnimations(int[] ids, GameCore.StoryScene.Animation[] objectsAnim) {
             
         }
         
-        public void FinishNonRepeatAnimations() {
+        public void CompleteAnimations() {
             
         }
 
-        public void FinishRepeatAnimations() {
+        public void StopAllRepeatAnimations() {
             
         }
 
@@ -94,14 +93,14 @@ namespace ClientComponentImpl.StoryScene {
             });
         }
 
-        public void ClearObjectTouchListeners() {
+        public void ClearInvestigationListeners() {
             foreach (int id in _interactableIDs) {
                 SetInteractCallback(id, null);
             }
             _interactableIDs.Clear();
         }
         
-        public void SetObjectTouchListener(int id, Action<int> callback) {
+        public void SetInvestigationListener(int id, Action<int> callback) {
             if (!_interactableIDs.Contains(id)) _interactableIDs.Add(id);
             else if (callback == null) _interactableIDs.Remove(id);
             SetInteractCallback(id, callback);
@@ -136,7 +135,7 @@ namespace ClientComponentImpl.StoryScene {
         }
         
         public void DisableTextInput() {
-
+            
         }
 
         public void HideSelections() {

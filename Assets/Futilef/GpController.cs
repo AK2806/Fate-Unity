@@ -11,6 +11,9 @@ namespace Futilef {
 		#region CMD
 		class Cmd { }
 
+		class StartRepeatCmd : Cmd { public int id; public Queue<Cmd> cmdQueue; }
+		class StopRepeatCmd : Cmd { public int id; }
+
 		class WaitCmd : Cmd { public float time; }
 
 		class ImgCmd : Cmd { public int id; }
@@ -24,7 +27,7 @@ namespace Futilef {
 		#endregion
 
 		#region ESJOB
-		class EsJob { public float time, duration; public int esType; public virtual void Apply(float step) {} public virtual void Finish() {} }
+		class EsJob { public float time, duration; public int esType; public int repeatID; public virtual void Apply(float step) {} public virtual void Finish() {} }
 
 		class EsImgJob            : EsJob    { public TpSprite *node; }
 		class EsSetImgPositionJob : EsImgJob { public float x, y, z, dx, dy, dz; public override void Apply(float step) { TpSprite.SetPosition(node, x + dx * step, y + dy * step, z + dz * step); } public override void Finish() { TpSprite.SetPosition(node, x + dx, y + dy, z + dz); } }
@@ -43,6 +46,11 @@ namespace Futilef {
 
 		float time;
 		float waitEndTime = -1, lastEsEndTime;
+
+		readonly Dictionary<int, Queue<Cmd>> repeatDict = new Dictionary<int, Queue<Cmd>>();
+		Queue<Cmd> repeatCmdQueue = null;
+		readonly Dictionary<int, float> repeatWaitEndTimeDict = new Dictionary<int, float>();
+		readonly Dictionary<int, float> repeatLastEsEndTimeDict = new Dictionary<int, float>();
 
 		readonly Dictionary<int, OnTouchDelegate> nodeTouchHandlerDict = new Dictionary<int, OnTouchDelegate>();
 
@@ -73,20 +81,49 @@ namespace Futilef {
 			time += deltaTime;
 
 			// execute commands
-			if (time > waitEndTime) {
-				while (time > waitEndTime && cmdQueue.Count > 0) {
-					var cmd = cmdQueue.Dequeue();
-					
+			while (time >= waitEndTime && cmdQueue.Count > 0) {
+				var cmd = cmdQueue.Dequeue();
+				
+				switch (cmd.GetType().Name) {
+					case "StartRepeatCmd":     StartRepeat(cmd as StartRepeatCmd); break;
+					case "StopRepeatCmd":      StopRepeat(cmd as StopRepeatCmd, deltaTime); break;
+					case "WaitCmd":            Wait(cmd as WaitCmd); break;
+					case "AddImgCmd":          AddImg(cmd as AddImgCmd); break;
+					case "RmImgCmd":           RmImg(cmd as RmImgCmd); break;
+					case "SetImgAttrCmd":      SetImgAttr(cmd as SetImgAttrCmd); break;
+					case "SetImgAttrEasedCmd": SetImgAttrEased(cmd as SetImgAttrEasedCmd); break;
+					case "SetCamAttrCmd":      SetCamAttr(cmd as SetCamAttrCmd); break;
+					case "SetCamAttrEasedCmd": SetCamAttrEased(cmd as SetCamAttrEasedCmd); break;
+				}
+			}
+
+			foreach (var kv in repeatDict) {
+				int id = kv.Key;
+				var queue = kv.Value;
+				var popCmds = new Queue<Cmd>();
+				while (time >= repeatWaitEndTimeDict[id] && queue.Count > 0) {
+					var cmd = queue.Dequeue();
+					bool discard = false;
 					switch (cmd.GetType().Name) {
-						case "WaitCmd":            Wait(cmd as WaitCmd); break;
-						case "AddImgCmd":          AddImg(cmd as AddImgCmd); break;
-						case "RmImgCmd":           RmImg(cmd as RmImgCmd); break;
-						case "SetImgAttrCmd":      SetImgAttr(cmd as SetImgAttrCmd); break;
-						case "SetImgAttrEasedCmd": SetImgAttrEased(cmd as SetImgAttrEasedCmd); break;
+						case "WaitCmd":            Repeat_Wait(id, cmd as WaitCmd); break;
 						case "SetCamAttrCmd":      SetCamAttr(cmd as SetCamAttrCmd); break;
-						case "SetCamAttrEasedCmd": SetCamAttrEased(cmd as SetCamAttrEasedCmd); break;
+						case "SetCamAttrEasedCmd": Repeat_SetCamAttrEased(id, cmd as SetCamAttrEasedCmd); break;
+						case "SetImgAttrCmd": {
+							var command = cmd as SetImgAttrCmd;
+							if (PtrIntDict.Contains(nodeDict, command.id)) SetImgAttr(command);
+							else discard = true;
+							break;
+						}
+						case "SetImgAttrEasedCmd": {
+							var command = cmd as SetImgAttrEasedCmd;
+							if (PtrIntDict.Contains(nodeDict, command.id)) Repeat_SetImgAttrEased(id, command);
+							else discard = true;
+							break;
+						}
 					}
-				}	
+					if (!discard) popCmds.Enqueue(cmd);
+				}
+				while (popCmds.Count > 0) queue.Enqueue(popCmds.Dequeue());
 			}
 
 			// execute easing jobs
@@ -147,9 +184,94 @@ namespace Futilef {
 			DrawCtx.Finish();
 		}
 
-		public void Wait(float time = -1) {
-			cmdQueue.Enqueue(new WaitCmd{ time = time });
+		public void Skip() {
+			for (var node = esJobList.First; node != null;) {
+				var next = node.Next;
+				var job = node.Value;
+				if (job.repeatID == -1) {
+					job.Finish();
+					esJobList.Remove(node);
+				}
+				node = next;
+			}
+			lastEsEndTime = waitEndTime = time;
+			while (cmdQueue.Count > 0) {
+				var cmd = cmdQueue.Dequeue();
+				switch (cmd.GetType().Name) {
+					case "StartRepeatCmd":     StartRepeat(cmd as StartRepeatCmd); break;
+					case "StopRepeatCmd":      StopRepeat(cmd as StopRepeatCmd); break;
+					case "AddImgCmd":          AddImg(cmd as AddImgCmd); break;
+					case "RmImgCmd":           RmImg(cmd as RmImgCmd); break;
+					case "SetImgAttrCmd":      SetImgAttr(cmd as SetImgAttrCmd); break;
+					case "SetImgAttrEasedCmd": SetImgAttr(cmd as SetImgAttrCmd); break;
+					case "SetCamAttrCmd":      SetCamAttr(cmd as SetCamAttrCmd); break;
+					case "SetCamAttrEasedCmd": SetCamAttr(cmd as SetCamAttrCmd); break;
+				}
+			}
 		}
+
+		public void RepeatDeclareBegin() {
+			repeatCmdQueue = new Queue<Cmd>();
+		}
+
+		public void RepeatDeclareEnd(int id) {
+			cmdQueue.Enqueue(new StartRepeatCmd{ id = id, cmdQueue = repeatCmdQueue });
+			repeatCmdQueue = null;
+		}
+
+		public void StopRepeat(int id) {
+			cmdQueue.Enqueue(new StopRepeatCmd{ id = id });
+		}
+
+		void StartRepeat(StartRepeatCmd cmd) {
+			repeatDict.Add(cmd.id, cmd.cmdQueue);
+			repeatWaitEndTimeDict.Add(cmd.id, 0.0f);
+			repeatLastEsEndTimeDict.Add(cmd.id, 0.0f);
+		}
+
+		void StopRepeat(StopRepeatCmd cmd, float deltaTime = -1.0f) {
+			if (cmd.id != -1) {
+				repeatDict.Remove(cmd.id);
+				for (var node = esJobList.First; node != null;) {
+					var next = node.Next;
+					var job = node.Value;
+					if (job.repeatID == cmd.id) {
+						if (deltaTime >= 0) job.Apply(Es.Ease(job.esType, (job.time + deltaTime) / job.duration));
+						esJobList.Remove(node);
+					}
+					node = next;
+				}
+			} else {
+				repeatDict.Clear();
+				for (var node = esJobList.First; node != null;) {
+					var next = node.Next;
+					var job = node.Value;
+					if (job.repeatID != -1) {
+						if (deltaTime >= 0) job.Apply(Es.Ease(job.esType, (job.time + deltaTime) / job.duration));
+						esJobList.Remove(node);
+					}
+					node = next;
+				}
+			}
+		}
+
+		public void Wait(float time = -1) {
+			if (repeatCmdQueue != null) {
+				repeatCmdQueue.Enqueue(new WaitCmd{ time = time });
+			} else {
+				cmdQueue.Enqueue(new WaitCmd{ time = time });
+			}
+		}
+
+		void Repeat_Wait(int id, WaitCmd cmd) {
+			if (cmd.time < 0) {  // wait for all animation to finish
+				if (repeatLastEsEndTimeDict[id] > repeatWaitEndTimeDict[id]) repeatWaitEndTimeDict[id] = repeatLastEsEndTimeDict[id];
+			} else {
+				float endTime = time + cmd.time;
+				if (endTime > repeatWaitEndTimeDict[id]) repeatWaitEndTimeDict[id] = endTime;
+			}
+		}
+
 		void Wait(WaitCmd cmd) {
 			if (cmd.time < 0) {  // wait for all animation to finish
 				if (lastEsEndTime > waitEndTime) waitEndTime = lastEsEndTime;
@@ -196,12 +318,22 @@ namespace Futilef {
 			#endif
 			if (cmd.id < 0) {
 				nodeTouchHandlerDict.Clear();
+				esJobList.Clear();
 				PtrIntDict.Clear(nodeDict);
 				PtrLst.Clear(spritePtrLst);
 				Pool.Clear(spritePool);
 			} else {
 				if (nodeTouchHandlerDict.ContainsKey(cmd.id)) nodeTouchHandlerDict.Remove(cmd.id);
 				void *node = PtrIntDict.Remove(nodeDict, cmd.id);
+				for (var lsNode = esJobList.First; lsNode != null;) {
+					var next = lsNode.Next;
+					var esJob = lsNode.Value;
+					if (esJob is EsImgJob) {
+						var esTpSpriteJob = (EsImgJob)esJob;
+						if (esTpSpriteJob.node == node) esJobList.Remove(lsNode);
+					}
+					lsNode = next;
+				}
 				PtrLst.Remove(spritePtrLst, node);
 				Pool.Free(spritePool, node);
 			}
@@ -220,10 +352,18 @@ namespace Futilef {
 		}
 
 		public void SetImgId(int id, int imgId) {
-			cmdQueue.Enqueue(new SetImgAttrCmd{ id = id, imgAttrId = ImgAttr.ImgId, args = new object[] { imgId } });
+			if (repeatCmdQueue != null) {
+				repeatCmdQueue.Enqueue(new SetImgAttrCmd{ id = id, imgAttrId = ImgAttr.ImgId, args = new object[] { imgId } });
+			} else {
+				cmdQueue.Enqueue(new SetImgAttrCmd{ id = id, imgAttrId = ImgAttr.ImgId, args = new object[] { imgId } });
+			}
 		}
 		public void SetImgAttr(int id, int imgAttrId, params object[] args) {
-			cmdQueue.Enqueue(new SetImgAttrCmd{ id = id, imgAttrId = imgAttrId, args = args });
+			if (repeatCmdQueue != null) {
+				repeatCmdQueue.Enqueue(new SetImgAttrCmd{ id = id, imgAttrId = imgAttrId, args = args });
+			} else {
+				cmdQueue.Enqueue(new SetImgAttrCmd{ id = id, imgAttrId = imgAttrId, args = args });
+			}
 		}
 		void SetImgAttr(SetImgAttrCmd cmd) {
 			#if FDB
@@ -244,8 +384,34 @@ namespace Futilef {
 		}
 
 		public void SetImgAttrEased(int id, int imgAttrId, float duration, int esType, params object[] args) {
-			cmdQueue.Enqueue(new SetImgAttrEasedCmd{ id = id, imgAttrId = imgAttrId, duration = duration, esType = esType, args = args });
+			if (repeatCmdQueue != null) {
+				repeatCmdQueue.Enqueue(new SetImgAttrEasedCmd{ id = id, imgAttrId = imgAttrId, duration = duration, esType = esType, args = args });
+			} else {
+				cmdQueue.Enqueue(new SetImgAttrEasedCmd{ id = id, imgAttrId = imgAttrId, duration = duration, esType = esType, args = args });
+			}
 		}
+
+		void Repeat_SetImgAttrEased(int id, SetImgAttrEasedCmd cmd) {
+			#if FDB
+			Should.True("nodeIdxDict.ContainsKey(cmd.id)", PtrIntDict.Contains(nodeDict, cmd.id));
+			Should.InRange("cmd.imgAttrId", cmd.imgAttrId, 0, ImgAttr.End - 1);
+			Should.GreaterThan("cmd.duration", cmd.duration, 0);
+			Should.InRange("cmd.esType", cmd.esType, 0, EsType.End - 1);
+			#endif
+			float endTime = time + cmd.duration;
+			if (endTime > repeatLastEsEndTimeDict[id]) repeatLastEsEndTimeDict[id] = endTime;
+
+			var img = (TpSprite *)PtrIntDict.Get(nodeDict, cmd.id);
+			var args = cmd.args;
+			switch (cmd.imgAttrId) {
+			case ImgAttr.Position: esJobList.AddLast(new EsSetImgPositionJob{ node = img, duration = cmd.duration, esType = cmd.esType, repeatID = id, x = img->pos[0],   dx = (float)args[0] - img->pos[0], y = img->pos[1], dy = (float)args[1] - img->pos[1], z = img->pos[2], dz = 0 }); break;// (float)args[2] - img->pos[2] }); break;
+			case ImgAttr.Rotation: esJobList.AddLast(new EsSetImgRotationJob{ node = img, duration = cmd.duration, esType = cmd.esType, repeatID = id, r = img->rot,      dr = (float)args[0] - img->rot }); break;
+			case ImgAttr.Scale:    esJobList.AddLast(new EsSetImgScaleJob{    node = img, duration = cmd.duration, esType = cmd.esType, repeatID = id, x = img->scl[0],   dx = (float)args[0] - img->scl[0], y = img->scl[1], dy = (float)args[1] - img->scl[1] }); break;
+			case ImgAttr.Alpha:    esJobList.AddLast(new EsSetImgAlphaJob{    node = img, duration = cmd.duration, esType = cmd.esType, repeatID = id, a = img->color[3], da = (float)args[0] - img->color[3] }); break;
+			case ImgAttr.Tint:     esJobList.AddLast(new EsSetImgTintJob{     node = img, duration = cmd.duration, esType = cmd.esType, repeatID = id, r = img->color[0], dr = (float)args[0] - img->color[0], g = img->color[1], dg = (float)args[1] - img->color[1], b = img->color[2], db = (float)args[2] - img->color[2] }); break;
+			}
+		}
+
 		void SetImgAttrEased(SetImgAttrEasedCmd cmd) {
 			#if FDB
 			Should.True("nodeIdxDict.ContainsKey(cmd.id)", PtrIntDict.Contains(nodeDict, cmd.id));
@@ -259,16 +425,20 @@ namespace Futilef {
 			var img = (TpSprite *)PtrIntDict.Get(nodeDict, cmd.id);
 			var args = cmd.args;
 			switch (cmd.imgAttrId) {
-			case ImgAttr.Position: esJobList.AddLast(new EsSetImgPositionJob{ node = img, duration = cmd.duration, esType = cmd.esType, x = img->pos[0],   dx = (float)args[0] - img->pos[0], y = img->pos[1], dy = (float)args[1] - img->pos[1], z = img->pos[2], dz = 0 }); break;// (float)args[2] - img->pos[2] }); break;
-			case ImgAttr.Rotation: esJobList.AddLast(new EsSetImgRotationJob{ node = img, duration = cmd.duration, esType = cmd.esType, r = img->rot,      dr = (float)args[0] - img->rot }); break;
-			case ImgAttr.Scale:    esJobList.AddLast(new EsSetImgScaleJob{    node = img, duration = cmd.duration, esType = cmd.esType, x = img->scl[0],   dx = (float)args[0] - img->scl[0], y = img->scl[1], dy = (float)args[1] - img->scl[1] }); break;
-			case ImgAttr.Alpha:    esJobList.AddLast(new EsSetImgAlphaJob{    node = img, duration = cmd.duration, esType = cmd.esType, a = img->color[3], da = (float)args[0] - img->color[3] }); break;
-			case ImgAttr.Tint:     esJobList.AddLast(new EsSetImgTintJob{     node = img, duration = cmd.duration, esType = cmd.esType, r = img->color[0], dr = (float)args[0] - img->color[0], g = img->color[1], dg = (float)args[1] - img->color[1], b = img->color[2], db = (float)args[2] - img->color[2] }); break;
+			case ImgAttr.Position: esJobList.AddLast(new EsSetImgPositionJob{ node = img, duration = cmd.duration, esType = cmd.esType, repeatID = -1, x = img->pos[0],   dx = (float)args[0] - img->pos[0], y = img->pos[1], dy = (float)args[1] - img->pos[1], z = img->pos[2], dz = 0 }); break;// (float)args[2] - img->pos[2] }); break;
+			case ImgAttr.Rotation: esJobList.AddLast(new EsSetImgRotationJob{ node = img, duration = cmd.duration, esType = cmd.esType, repeatID = -1, r = img->rot,      dr = (float)args[0] - img->rot }); break;
+			case ImgAttr.Scale:    esJobList.AddLast(new EsSetImgScaleJob{    node = img, duration = cmd.duration, esType = cmd.esType, repeatID = -1, x = img->scl[0],   dx = (float)args[0] - img->scl[0], y = img->scl[1], dy = (float)args[1] - img->scl[1] }); break;
+			case ImgAttr.Alpha:    esJobList.AddLast(new EsSetImgAlphaJob{    node = img, duration = cmd.duration, esType = cmd.esType, repeatID = -1, a = img->color[3], da = (float)args[0] - img->color[3] }); break;
+			case ImgAttr.Tint:     esJobList.AddLast(new EsSetImgTintJob{     node = img, duration = cmd.duration, esType = cmd.esType, repeatID = -1, r = img->color[0], dr = (float)args[0] - img->color[0], g = img->color[1], dg = (float)args[1] - img->color[1], b = img->color[2], db = (float)args[2] - img->color[2] }); break;
 			}
 		}
 
 		public void SetCamAttr(int camAttrId, params object[] args) {
-			cmdQueue.Enqueue(new SetCamAttrCmd{ camAttrId = camAttrId, args = args });
+			if (repeatCmdQueue != null) {
+				repeatCmdQueue.Enqueue(new SetCamAttrCmd{ camAttrId = camAttrId, args = args });
+			} else {
+				cmdQueue.Enqueue(new SetCamAttrCmd{ camAttrId = camAttrId, args = args });
+			}
 		}
 		void SetCamAttr(SetCamAttrCmd cmd) {
 			var args = cmd.args;
@@ -279,7 +449,21 @@ namespace Futilef {
 		}
 
 		public void SetCamAttrEased(int camAttrId, float duration, int esType, params object[] args) {
-			cmdQueue.Enqueue(new SetCamAttrEasedCmd{ camAttrId = camAttrId, duration = duration, esType = esType, args = args });
+			if (repeatCmdQueue != null) {
+				repeatCmdQueue.Enqueue(new SetCamAttrEasedCmd{ camAttrId = camAttrId, duration = duration, esType = esType, args = args });
+			} else {
+				cmdQueue.Enqueue(new SetCamAttrEasedCmd{ camAttrId = camAttrId, duration = duration, esType = esType, args = args });
+			}
+		}
+		void Repeat_SetCamAttrEased(int id, SetCamAttrEasedCmd cmd) {
+			float endTime = time + cmd.duration;
+			if (endTime > repeatLastEsEndTimeDict[id]) repeatLastEsEndTimeDict[id] = endTime;
+
+			var args = cmd.args;
+			switch (cmd.camAttrId) {
+			case CamAttr.Position: esJobList.AddLast(new EsSetCamPositionJob{ cam = cam, duration = cmd.duration, esType = cmd.esType, repeatID = id, x = cam.transform.position.x, y = cam.transform.position.y, dx = (float)args[0] - cam.transform.position.x, dy = (float)args[1] - cam.transform.position.y }); break;
+			case CamAttr.Zoom:     esJobList.AddLast(new EsSetCamZoomJob{     cam = cam, duration = cmd.duration, esType = cmd.esType, repeatID = id, s = cam.orthographicSize, ds = (float)args[0] - cam.orthographicSize }); break;
+			}
 		}
 		void SetCamAttrEased(SetCamAttrEasedCmd cmd) {
 			float endTime = time + cmd.duration;
@@ -287,8 +471,8 @@ namespace Futilef {
 
 			var args = cmd.args;
 			switch (cmd.camAttrId) {
-			case CamAttr.Position: esJobList.AddLast(new EsSetCamPositionJob{ cam = cam, duration = cmd.duration, esType = cmd.esType, x = cam.transform.position.x, y = cam.transform.position.y, dx = (float)args[0] - cam.transform.position.x, dy = (float)args[1] - cam.transform.position.y }); break;
-			case CamAttr.Zoom:     esJobList.AddLast(new EsSetCamZoomJob{     cam = cam, duration = cmd.duration, esType = cmd.esType, s = cam.orthographicSize, ds = (float)args[0] - cam.orthographicSize }); break;
+			case CamAttr.Position: esJobList.AddLast(new EsSetCamPositionJob{ cam = cam, duration = cmd.duration, esType = cmd.esType, repeatID = -1, x = cam.transform.position.x, y = cam.transform.position.y, dx = (float)args[0] - cam.transform.position.x, dy = (float)args[1] - cam.transform.position.y }); break;
+			case CamAttr.Zoom:     esJobList.AddLast(new EsSetCamZoomJob{     cam = cam, duration = cmd.duration, esType = cmd.esType, repeatID = -1, s = cam.orthographicSize, ds = (float)args[0] - cam.orthographicSize }); break;
 			}
 		}
 	}

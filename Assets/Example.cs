@@ -22,7 +22,7 @@ public class Example : MonoBehaviour {
 				text.text = "";
 			}
 			text.text += i;
-			yield return new WaitForSeconds(0.01f);
+			yield return new WaitForSeconds(0.02f);
 		}
 	}
 
@@ -81,12 +81,27 @@ public class Example : MonoBehaviour {
 		gpc.SetImgAttr(13, ImgAttr.Scale, 0.78f, 0.78f);
 		gpc.SetImgAttr(13, ImgAttr.Alpha, 1f);
 
-		gpc.Wait(3f);
-		gpc.SetImgAttrEased(1, ImgAttr.Tint, 0.5f, EsType.CubicIn, 1.0f, 0.4f, 0f);
-		gpc.SetImgAttrEased(3, ImgAttr.Tint, 0.5f, EsType.CubicIn, 1.0f, 0.4f, 0f);
-		gpc.SetImgAttrEased(6, ImgAttr.Tint, 0.5f, EsType.CubicIn, 1.0f, 0.4f, 0f);
-		gpc.SetImgAttrEased(4, ImgAttr.Tint, 0.5f, EsType.CubicIn, 1.0f, 0.4f, 0f);
+		gpc.Wait(1f);
+		gpc.RepeatDeclareBegin();
+		gpc.Wait();
+		gpc.SetImgAttrEased(1, ImgAttr.Alpha, 0.5f, EsType.Linear, 0.0f);
+		gpc.SetImgAttrEased(3, ImgAttr.Alpha, 0.5f, EsType.Linear, 0.0f);
+		gpc.SetImgAttrEased(6, ImgAttr.Alpha, 0.5f, EsType.Linear, 0.0f);
+		gpc.SetImgAttrEased(4, ImgAttr.Alpha, 0.5f, EsType.Linear, 0.0f);
+		gpc.Wait();
+		gpc.SetImgAttrEased(1, ImgAttr.Alpha, 0.5f, EsType.Linear, 1.0f);
+		gpc.SetImgAttrEased(3, ImgAttr.Alpha, 0.5f, EsType.Linear, 1.0f);
+		gpc.SetImgAttrEased(6, ImgAttr.Alpha, 0.5f, EsType.Linear, 1.0f);
+		gpc.SetImgAttrEased(4, ImgAttr.Alpha, 0.5f, EsType.Linear, 1.0f);
+		gpc.RepeatDeclareEnd(0);
+		
+		gpc.Wait(0.7f);
+		gpc.RmImg(4);
 
+		//gpc.Skip();
+		gpc.Wait(0.5f);
+		gpc.StopRepeat(0);
+ 
 		StartCoroutine(TextAnimChange());
 		/*
 		gpc.Wait(0.8f);
