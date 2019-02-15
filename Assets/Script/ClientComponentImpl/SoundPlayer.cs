@@ -2,7 +2,7 @@ using System;
 using GameService.ClientComponent;
 using GameCore;
 
-namespace ClientComponentImpl {
+namespace FateUnity.ClientComponentImpl {
     public class SoundPlayer : ISoundPlayer {
         public void PlayBGM(AssetReference music) {
 

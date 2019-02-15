@@ -6,7 +6,7 @@ using GameService.Util;
 using GameService.ClientComponent;
 using GameCore;
 
-namespace ClientComponentImpl {
+namespace FateUnity.ClientComponentImpl {
     public sealed class ResourceLoader : IResourceLoader {
         public void AsyncReload(AssetReference[] resources) {
 

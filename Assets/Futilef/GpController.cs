@@ -184,6 +184,10 @@ namespace Futilef {
 			DrawCtx.Finish();
 		}
 
+		public bool IsWorking() {
+			return cmdQueue.Count > 0;
+		}
+
 		public void Skip() {
 			for (var node = esJobList.First; node != null;) {
 				var next = node.Next;
@@ -221,6 +225,10 @@ namespace Futilef {
 
 		public void StopRepeat(int id) {
 			cmdQueue.Enqueue(new StopRepeatCmd{ id = id });
+		}
+
+		public bool IsRepeatIDAllocated(int id) {
+			return repeatDict.ContainsKey(id);
 		}
 
 		void StartRepeat(StartRepeatCmd cmd) {

@@ -19,13 +19,6 @@ namespace Futilef {
 			return texture;
 		}
 
-		public static void ReleaseTexture(int id) {
-			if (!textureDict.ContainsKey(id)) return;
-			var texture = textureDict[id];
-			textureDict.Remove(id);
-			Object.Destroy(texture);
-		}
-
 		public static void LoadAtlases(params int[] ids) {
 			for (int i = 0, len = ids.Length; i < len; i += 1) {
 				int id = ids[i];
@@ -45,7 +38,11 @@ namespace Futilef {
 				int id = ids[i];
 				var atlasMeta = (TpAtlasMeta *)atlasMetaLst->arr[i];
 				if (atlasMeta->name == id) {
-					ReleaseTexture(id);
+					if (textureDict.ContainsKey(id)) {
+						var texture = textureDict[id];
+						textureDict.Remove(id);
+						Object.Destroy(texture);
+					}
 					for (int j = 0, jlen = atlasMeta->spriteCount; j < jlen; j += 1) {
 						var spriteMeta = atlasMeta->sprites + j;
 						PtrIntDict.Remove(spriteMetaDict, spriteMeta->name);
@@ -65,6 +62,17 @@ namespace Futilef {
 		public static bool HasSpriteMeta(int id) {
 			return PtrIntDict.Contains(spriteMetaDict, id);
 			// return spriteMetaLstIdxDict.ContainsKey(id);
+		}
+
+		public static Sprite CreateSprite(int id) {
+			TpSpriteMeta* meta = GetSpriteMeta(id);
+			var texture = GetTexture(meta->atlas->name);
+			float* atlasSize = meta->atlas->size;
+			float* uv = meta->uv;
+			float* p = meta->pivot;
+			var rect = new Rect(uv[0], atlasSize[1] - uv[1] - uv[3], uv[2], uv[3]);
+			var pivot = new Vector2(p[0] / rect.width, (uv[3] - p[1]) / rect.height);
+			return Sprite.Create(texture, rect, pivot);
 		}
 	}
 }

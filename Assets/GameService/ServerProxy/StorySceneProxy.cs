@@ -16,7 +16,10 @@ using GameService.ServerProxy.DataComponent.StoryScene;
 namespace GameService.ServerProxy {
     public class StorySceneProxy : ServerComponentProxy {
         private IStorySceneController _controller = null;
+
         private IdentifiedObjectList<SceneObject> _objectList = new IdentifiedObjectList<SceneObject>();
+        private readonly SceneCamera _camera = new SceneCamera();
+
         private bool _investigating = false; //Indicate using InvestigationView or StoryView
         private Character _talker1 = null; //Indicate talk mode when talker1 and talker2 is not null
         private Character _talker2 = null;
@@ -76,7 +79,7 @@ namespace GameService.ServerProxy {
             }
         }
 
-        public void SetController(IStorySceneController controller) {
+        public void BindController(IStorySceneController controller) {
             _controller = controller;
             _controller.SetSelectListener(SelectSelection);
             _controller.SetTextInputListener(InputDialogText);
@@ -126,25 +129,37 @@ namespace GameService.ServerProxy {
                         break;
                     case StorySceneExecuteAnimCommandsMessage.MESSAGE_TYPE: {
                             var msg = (StorySceneExecuteAnimCommandsMessage)message;
-                            var idList = new List<int>();
-                            var animList = new List<Animation>();
-                            int cameraAnimIdx = -1;
-                            for (int i = 0; i < msg.objectsID.Length; ++i) {
-                                int id = IdentificationConverter.GetID(msg.objectsID[i]);
-                                if (id == -1) {
-                                    cameraAnimIdx = i;
-                                } else {
-                                    idList.Add(id);
-                                    animList.Add(msg.animations[i]);
+                            if (msg.hasCameraAnimation) {
+                                var camAnimation = msg.cameraAnimation;
+                                if (_camera.RepeatingAnimation && camAnimation.repeatEndTime >= 0) {
+                                    _controller.SetCameraCurrentRepeatStopAt(camAnimation.repeatEndTime);
+                                    _camera.RepeatingAnimation = false;
+                                }
+                                if (!_camera.RepeatingAnimation && camAnimation.commands.Length > 0) {
+                                    _controller.SetCameraAnimation((CameraAnimCommand[])camAnimation.commands);
+                                }
+                                if (!_camera.RepeatingAnimation && camAnimation.repeatStartOffsetTime >= 0 && camAnimation.repeatCommands.Length > 0) {
+                                    _controller.SetCameraNextRepeatStartAfter((CameraAnimCommand[])camAnimation.repeatCommands, camAnimation.repeatStartOffsetTime);
+                                    _camera.RepeatingAnimation = true;
                                 }
                             }
-                            int[] ids = idList.ToArray();
-                            Animation[] animations = animList.ToArray();
-                            if (cameraAnimIdx != -1) {
-                                _controller.PlayAnimations(msg.animations[cameraAnimIdx], ids, animations);
-                            } else {
-                                _controller.PlayAnimations(ids, animations);
+                            for (int i = 0; i < msg.objectsID.Length; ++i) {
+                                int id = IdentificationConverter.GetID(msg.objectsID[i]);
+                                var objAnimation = msg.objectsAnimation[i];
+                                var obj = _objectList[id];
+                                if (obj.RepeatingAnimation && objAnimation.repeatEndTime >= 0) {
+                                    _controller.SetObjectCurrentRepeatStopAt(id, objAnimation.repeatEndTime);
+                                    obj.RepeatingAnimation = false;
+                                }
+                                if (!obj.RepeatingAnimation && objAnimation.commands.Length > 0) {
+                                    _controller.SetObjectAnimation(id, (ObjectAnimCommand[])objAnimation.commands);
+                                }
+                                if (!obj.RepeatingAnimation && objAnimation.repeatStartOffsetTime >= 0 && objAnimation.repeatCommands.Length > 0) {
+                                    _controller.SetObjectNextRepeatStartAfter(id, (ObjectAnimCommand[])objAnimation.repeatCommands, objAnimation.repeatStartOffsetTime);
+                                    obj.RepeatingAnimation = true;
+                                }
                             }
+                            _controller.PlayAnimations();
                         }
                         break;
                     case StorySceneCompleteAnimCommandsMessage.MESSAGE_TYPE: {

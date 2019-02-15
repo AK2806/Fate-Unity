@@ -3,6 +3,7 @@ using GameCore.StoryScene;
 using GameCore.BattleScene;
 using System.Diagnostics;
 using GameCore.Proxy;
+using GameCore.StoryScene.AnimationCommand;
 
 namespace GameCore.Network.ServerMessages {
 	public sealed class UserOnlineMessage : Message {
@@ -1301,18 +1302,94 @@ namespace GameCore.Network.ServerMessages {
 	public sealed class StorySceneExecuteAnimCommandsMessage : Message {
 		public const int MESSAGE_TYPE = -5;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
-		
+
+		public struct ObjectAnimation : IStreamable {
+			public float repeatStartOffsetTime;
+			public float repeatEndTime;
+			public ObjectAnimCommand[] commands;
+			public ObjectAnimCommand[] repeatCommands;
+
+			public void ReadFrom(IDataInputStream stream) {
+				repeatStartOffsetTime = stream.ReadSingle();
+				repeatEndTime = stream.ReadSingle();
+				int length = stream.ReadInt32();
+				commands = new ObjectAnimCommand[length];
+				for (int i = 0; i < length; ++i) {
+					commands[i] = InputStreamHelper.ReadStorySceneObjectCommand(stream);
+				}
+				length = stream.ReadInt32();
+				repeatCommands = new ObjectAnimCommand[length];
+				for (int i = 0; i < length; ++i) {
+					repeatCommands[i] = InputStreamHelper.ReadStorySceneObjectCommand(stream);
+				}
+			}
+
+			public void WriteTo(IDataOutputStream stream) {
+				stream.WriteSingle(repeatStartOffsetTime);
+				stream.WriteSingle(repeatEndTime);
+				stream.WriteInt32(commands.Length);
+				foreach (var cmd in commands) {
+					OutputStreamHelper.WriteStorySceneObjectCommand(stream, cmd);
+				}
+				stream.WriteInt32(repeatCommands.Length);
+				foreach (var cmd in repeatCommands) {
+					OutputStreamHelper.WriteStorySceneObjectCommand(stream, cmd);
+				}
+			}
+		}
+
+		public struct CameraAnimation : IStreamable {
+			public float repeatStartOffsetTime;
+			public float repeatEndTime;
+			public CameraAnimCommand[] commands;
+			public CameraAnimCommand[] repeatCommands;
+
+			public void ReadFrom(IDataInputStream stream) {
+				repeatStartOffsetTime = stream.ReadSingle();
+				repeatEndTime = stream.ReadSingle();
+				int length = stream.ReadInt32();
+				commands = new CameraAnimCommand[length];
+				for (int i = 0; i < length; ++i) {
+					commands[i] = InputStreamHelper.ReadStorySceneCameraCommand(stream);
+				}
+				length = stream.ReadInt32();
+				repeatCommands = new CameraAnimCommand[length];
+				for (int i = 0; i < length; ++i) {
+					repeatCommands[i] = InputStreamHelper.ReadStorySceneCameraCommand(stream);
+				}
+			}
+
+			public void WriteTo(IDataOutputStream stream) {
+				stream.WriteSingle(repeatStartOffsetTime);
+				stream.WriteSingle(repeatEndTime);
+				stream.WriteInt32(commands.Length);
+				foreach (var cmd in commands) {
+					OutputStreamHelper.WriteStorySceneCameraCommand(stream, cmd);
+				}
+				stream.WriteInt32(repeatCommands.Length);
+				foreach (var cmd in repeatCommands) {
+					OutputStreamHelper.WriteStorySceneCameraCommand(stream, cmd);
+				}
+			}
+		}
+
 		public Identification[] objectsID;
-		public Animation[] animations;
+		public ObjectAnimation[] objectsAnimation;
+		public bool hasCameraAnimation;
+		public CameraAnimation cameraAnimation;
 
 		public override void WriteTo(IDataOutputStream stream) {
-			Debug.Assert(objectsID.Length == animations.Length);
+			Debug.Assert(objectsID.Length == objectsAnimation.Length);
 			stream.WriteInt32(objectsID.Length);
 			foreach (var objID in objectsID) {
 				objID.WriteTo(stream);
 			}
-			foreach (var objAnim in animations) {
+			foreach (var objAnim in objectsAnimation) {
 				objAnim.WriteTo(stream);
+			}
+			stream.WriteBoolean(hasCameraAnimation);
+			if (hasCameraAnimation) {
+				cameraAnimation.WriteTo(stream);
 			}
 		}
 
@@ -1322,9 +1399,13 @@ namespace GameCore.Network.ServerMessages {
 			for (int i = 0; i < length; ++i) {
 				objectsID[i].ReadFrom(stream);
 			}
-			animations = new Animation[length];
+			objectsAnimation = new ObjectAnimation[length];
 			for (int i = 0; i < length; ++i) {
-				animations[i].ReadFrom(stream);
+				objectsAnimation[i].ReadFrom(stream);
+			}
+			hasCameraAnimation = stream.ReadBoolean();
+			if (hasCameraAnimation) {
+				cameraAnimation.ReadFrom(stream);
 			}
 		}
 	}

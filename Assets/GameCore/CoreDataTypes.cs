@@ -196,9 +196,6 @@ namespace GameCore {
 	}
 
 	namespace StoryScene {
-		using Proxy;
-		using AnimationCommand;
-
 		public struct Portrait : IStreamable {
 			public AssetReference[] sprites;
 
@@ -242,20 +239,17 @@ namespace GameCore {
 				Elastic = 40, ElasticIn = 41, ElasticOut = 42, ElasticInOut = 43,
 				Bounce = 44, BounceIn = 45, BounceOut = 46, BounceInOut = 47
 			}
-
-			public class AnimCommand {
-				public readonly bool isCamera;
+			
+			public class ObjectAnimCommand {
 				public readonly bool isEased;
-				public float startTime = 0.0f;
-				protected AnimCommand(bool camera, bool ease) { isCamera = camera; isEased = ease; }
+				public float timeOffset = 0.0f;
+				protected ObjectAnimCommand(bool ease) { isEased = ease; }
 			}
 
-			public class ObjectAnimCommand : AnimCommand {
-				protected ObjectAnimCommand(bool ease) : base(false, ease) { }
-			}
-
-			public class CameraAnimCommand : AnimCommand {
-				protected CameraAnimCommand(bool ease) : base(true, ease) { }
+			public class CameraAnimCommand {
+				public readonly bool isEased;
+				public float timeOffset = 0.0f;
+				protected CameraAnimCommand(bool ease) { isEased = ease; }
 			}
 
 			public class SetObjectAttribute : ObjectAnimCommand {
@@ -365,28 +359,6 @@ namespace GameCore {
 			public sealed class EaseCameraZoom : EaseCameraAttribute {
 				public float val;
 				public EaseCameraZoom() : base(CameraAttrType.Zoom) { }
-			}
-		}
-
-		public struct Animation : IStreamable {
-			public float repeatStartTime;
-			public AnimCommand[] commands;
-
-			public void ReadFrom(IDataInputStream stream) {
-				repeatStartTime = stream.ReadSingle();
-				int length = stream.ReadInt32();
-				commands = new AnimCommand[length];
-				for (int j = 0; j < length; ++j) {
-					commands[j] = InputStreamHelper.ReadStorySceneObjectCommand(stream);
-				}
-			}
-
-			public void WriteTo(IDataOutputStream stream) {
-				stream.WriteSingle(repeatStartTime);
-				stream.WriteInt32(commands.Length);
-				foreach (var cmd in commands) {
-					OutputStreamHelper.WriteStorySceneObjectCommand(stream, cmd);
-				}
 			}
 		}
 	}

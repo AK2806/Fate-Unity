@@ -2,6 +2,7 @@
 using UnityEngine.UI;
 using Futilef;
 using System.Collections;
+using FateUnity.UI;
 
 using ImgAttr = Futilef.GpController.ImgAttr;
 
@@ -13,6 +14,10 @@ public class Example : MonoBehaviour {
 	GpController gpc;
 
 	public Text text;
+	public Image image;
+	public ObjectListView listViewPrefab;
+
+ 	DefaultObjectListModel<DefaultListObject> model = new DefaultObjectListModel<DefaultListObject>();
 
 	IEnumerator TextAnimChange() {
 		int i = 9;
@@ -24,6 +29,13 @@ public class Example : MonoBehaviour {
 			text.text += i;
 			yield return new WaitForSeconds(0.02f);
 		}
+	}
+
+	IEnumerator Test() {
+		yield return new WaitForSeconds(15.0f);
+		model.RemoveItemAt(0, 0);
+		model.AddItem(new DefaultListObject() { name = "布鲁特", image = image.sprite }, 1);
+		Debug.Log("List modified.");
 	}
 
 	void OnEnable() {
@@ -81,6 +93,19 @@ public class Example : MonoBehaviour {
 		gpc.SetImgAttr(13, ImgAttr.Scale, 0.78f, 0.78f);
 		gpc.SetImgAttr(13, ImgAttr.Alpha, 1f);
 
+		gpc.AddImg(100, 1);
+		gpc.SetImgAttr(100, ImgAttr.Position, 1000f, 100f, 0f);
+		gpc.SetImgAttr(100, ImgAttr.Rotation, 0f);
+		gpc.SetImgAttr(100, ImgAttr.Alpha, 1f);
+		//gpc.SetImgAttrEased(100, ImgAttr.Scale, 1f, EsType.ElasticOut, 0.01f, 0.01f);
+		gpc.Wait(2.5f);
+		gpc.SetImgAttrEased(100, ImgAttr.Tint, 1.5f, EsType.ElasticOut, 1f, 0.5f, 1f);
+		gpc.SetImgAttrEased(100, ImgAttr.Position, 2f, EsType.ElasticOut, 2f, -1f, 0f);
+		gpc.Wait();
+		gpc.SetImgAttrEased(100, ImgAttr.Tint, 1.5f, EsType.ElasticOut, 1f, 1f, 1f);
+		gpc.SetImgAttrEased(100, ImgAttr.Position, 2f, EsType.ElasticOut, -2f, 2f, 0f);
+		gpc.SetImgAttrEased(100, ImgAttr.Rotation, 1.5f, EsType.ElasticOut, Mathf.PI * 2.5f);
+		
 		gpc.Wait(1f);
 		gpc.RepeatDeclareBegin();
 		gpc.Wait();
@@ -94,15 +119,33 @@ public class Example : MonoBehaviour {
 		gpc.SetImgAttrEased(6, ImgAttr.Alpha, 0.5f, EsType.Linear, 1.0f);
 		gpc.SetImgAttrEased(4, ImgAttr.Alpha, 0.5f, EsType.Linear, 1.0f);
 		gpc.RepeatDeclareEnd(0);
-		
+
 		gpc.Wait(0.7f);
 		gpc.RmImg(4);
 
 		//gpc.Skip();
 		gpc.Wait(0.5f);
 		gpc.StopRepeat(0);
- 
+
+		gpc.Wait(5.0f);
+		gpc.RmImg(-1);
+		
+		image.sprite = Res.CreateSprite(1);
+		image.SetNativeSize();
 		StartCoroutine(TextAnimChange());
+		StartCoroutine(Test());
+
+		var listView = Instantiate(listViewPrefab);
+		listView.BindModel(model);
+		model.AddGroup("分类 A");
+		model.AddGroup("分类 B");
+		model.AddItem(new DefaultListObject() { name = "布鲁特", image = image.sprite });
+		model.AddItem(new DefaultListObject() { name = "蓝波", image = Res.CreateSprite(2) });
+		model.AddItem(new DefaultListObject() { name = "李莉", image = Res.CreateSprite(3) });
+		model.AddItem(new DefaultListObject() { name = "女警", image = Res.CreateSprite(5) });
+		model.AddItem(new DefaultListObject() { name = "干员", image = Res.CreateSprite(6) });
+		model.AddItem(new DefaultListObject() { name = "???", image = Res.CreateSprite(4) }, 1);
+		model.MultipleChosen = true;
 		/*
 		gpc.Wait(0.8f);
 		gpc.SetImgAttrEased(1, ImgAttr.Tint, 0.5f, EsType.CubicOut, 1.0f, 1.0f, 1.0f);
@@ -158,7 +201,7 @@ public class Example : MonoBehaviour {
 			gpc.AddImg(1, 4);
 			
 			gpc.SetImgAttr(1, ImgAttr.Position, 0f, 0f, 0f);
-			gpc.SetImgAttr(1, ImgAttr.Rotation, 0f);·
+			gpc.SetImgAttr(1, ImgAttr.Rotation, 0f);
 			gpc.SetImgAttr(1, ImgAttr.Alpha, 1f);
 			gpc.SetImgAttrEased(1, ImgAttr.Scale, 1f, EsType.ElasticOut, 0.01f, 0.01f);
 			gpc.Wait(.5f);
@@ -184,13 +227,20 @@ public class Example : MonoBehaviour {
 		}
  		*/
 	}
-
+	void Start() {
+		
+	}
 	void Update() {
 		if (gpc != null) gpc.Update(Time.deltaTime);
 	}
 	 
 	void OnDisable() {
 		Debug.Log("Clean up ");
-		gpc.Dispose();
+		if (gpc != null) gpc.Dispose();
+		gpc = null;
+	}
+
+	public void Print(string s) {
+		Debug.Log(s);
 	}
 }

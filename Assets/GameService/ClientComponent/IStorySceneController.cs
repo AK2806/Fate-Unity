@@ -8,14 +8,23 @@ using GameService.Util;
 
 namespace GameService.ClientComponent {
     public interface IStorySceneController {
+        // take effect after animations done
         void ClearObjects();
-
         void AddObject(int id, AssetReference[] spriteGroup);
         void RemoveObject(int id);
+        ////////////////////////////////////
 
-        void PlayAnimations(Animation cameraAnimation, int[] ids, Animation[] animations);
-        void PlayAnimations(int[] ids, Animation[] animations);
-        void CompleteAnimations();
+        // (animation settings) take effect while playing animations
+        void SetCameraAnimation(CameraAnimCommand[] cameraAnimation);
+        void SetObjectAnimation(int id, ObjectAnimCommand[] objectAnimation);
+        void SetCameraNextRepeatStartAfter(CameraAnimCommand[] repeatAnimation, float offsetTime);
+        void SetCameraCurrentRepeatStopAt(float endTime);
+        void SetObjectNextRepeatStartAfter(int id, ObjectAnimCommand[] repeatAnimation, float offsetTime);
+        void SetObjectCurrentRepeatStopAt(int id, float endTime);
+        ////////////////////////////////////////////////////////////
+
+        void PlayAnimations(); // Enqueue animation settings
+        void CompleteAnimations(); // Skip animations in queue
         
         void ClearInvestigationListeners();
         void SetInvestigationListener(int id, Action<int> callback);
