@@ -5,7 +5,6 @@ using GameCore.Network;
 using GameCore.Network.ClientMessages;
 using GameCore.Network.ServerMessages;
 using GameCore;
-using GameCore.Proxy;
 using GameCore.StoryScene;
 using GameCore.StoryScene.AnimationCommand;
 using GameService.Util;
@@ -16,6 +15,7 @@ using GameService.ServerProxy.DataComponent.StoryScene;
 namespace GameService.ServerProxy {
     public class StorySceneProxy : ServerComponentProxy {
         private IStorySceneController _controller = null;
+        private bool _controllerActive = false;
 
         private IdentifiedObjectList<SceneObject> _objectList = new IdentifiedObjectList<SceneObject>();
         private readonly SceneCamera _camera = new SceneCamera();
@@ -42,11 +42,41 @@ namespace GameService.ServerProxy {
             connection.AddMessageReceiver(StorySceneUpdateDialogMessage.MESSAGE_TYPE, this);
         }
 
+        public void BindController(IStorySceneController controller) {
+            _controller = controller;
+        }
+
+        public void ResetController() {
+            _controller.ClearObjectInteractionListeners();
+            _controller.CompleteAnimations();
+            _controller.ClearObjects();
+            _controller.DisableFreedomCameraView();
+            _controller.DisableDialogTextInput();
+            _controller.ShowDialog();
+            _controller.DisplayDialogText("", new Vec3(1, 1, 1));
+            _controller.DisplayDialogPortrait(-1);
+            _controller.HideSelections();
+        }
+
+        public void ActiveController() {
+            _controllerActive = true;
+            ResetController();
+        }
+
+        public void InactiveController() {
+            _controllerActive = false;
+            _controller.HideSelections();
+            _controller.HideDialog();
+            _controller.DisableFreedomCameraView();
+            _controller.CompleteAnimations();
+            _controller.ClearObjects();
+        }
+
         public void InteractWithObject(int id) {
             if (_investigating) return;
             _controller.CompleteAnimations();
             var message = new StorySceneInvestigateObjectMessage();
-            message.objID = IdentificationConverter.GetIdentification(_objectList[id]);
+            message.objID = new RuntimeId { value = _objectList[id].ID };
             ConnectionRef.SendMessage(message);
         }
 
@@ -57,16 +87,19 @@ namespace GameService.ServerProxy {
             ConnectionRef.SendMessage(message);
         }
 
+        public void InputDialogText(string text) {
+            InputDialogText(text, null);
+        }
+
         public void InputDialogText(string text, IList<User> to) {
-            if (!_investigating
-            && ((_isTalker1Talking && _talker1.Controller == GameServerProxy.Instance.Self)
+            if (!_investigating && ((_isTalker1Talking && _talker1.Controller == GameServerProxy.Instance.Self)
                 || (!_isTalker1Talking && _talker2.Controller == GameServerProxy.Instance.Self))) {
                 if (to != null && GameServerProxy.Instance.Self.IsDM) {
                     var message = new StorySceneDMDialogSendPrivateTextMessage();
-                    var players = new Identification[to.Count];
+                    var players = new RuntimeId[to.Count];
                     for (int i = 0; i < to.Count; ++i) {
                         if (to[i].IsDM) continue;
-                        players[i] = IdentificationConverter.GetIdentification(to[i]);
+                        players[i] = new RuntimeId { value = to[i].ID };
                     }
                     message.players = players;
                     message.text = text;
@@ -79,31 +112,19 @@ namespace GameService.ServerProxy {
             }
         }
 
-        public void BindController(IStorySceneController controller) {
-            _controller = controller;
-            _controller.SetSelectListener(SelectSelection);
-            _controller.SetTextInputListener(InputDialogText);
-        }
-
         public override void MessageReceived(Message message) {
             try {
                 switch (message.MessageType) {
                     case StorySceneResetMessage.MESSAGE_TYPE: {
                             _investigating = false;
                             _talker1 = _talker2 = null;
-                            _controller.DisableTextInput();
-                            _controller.ClearDialog();
-                            _controller.HideSelections();
-                            _controller.DisableInvestigationView();
-                            _controller.ClearInvestigationListeners();
-                            _controller.CompleteAnimations();
-                            _controller.ClearObjects();
+                            ResetController();
                         }
                         break;
                     case StorySceneCreateObjectMessage.MESSAGE_TYPE: {
                             var msg = (StorySceneCreateObjectMessage)message;
-                            var character = CharacterManager.Instance.FindCharacter(IdentificationConverter.GetID(msg.objID));
-                            int id = IdentificationConverter.GetID(msg.objID);
+                            var character = CharacterManager.Instance.FindCharacter(msg.objID.value);
+                            int id = msg.objID.value;
                             var sceneObj = new SceneObject(id, character, msg.portrait);
                             _objectList.Add(sceneObj);
                             _controller.AddObject(id, msg.portrait.sprites);
@@ -111,19 +132,19 @@ namespace GameService.ServerProxy {
                         break;
                     case StorySceneDestroyObjectMessage.MESSAGE_TYPE: {
                             var msg = (StorySceneDestroyObjectMessage)message;
-                            int id = IdentificationConverter.GetID(msg.objID);
+                            int id = msg.objID.value;
                             _objectList.Remove(id);
                             _controller.RemoveObject(id);
                         }
                         break;
                     case StorySceneUpdateObjectDataMessage.MESSAGE_TYPE: {
                             var msg = (StorySceneUpdateObjectDataMessage)message;
-                            int id = IdentificationConverter.GetID(msg.objID);
+                            int id = msg.objID.value;
                             _objectList[id].Interactable = msg.interactable;
                             if (msg.interactable) {
-                                _controller.SetInvestigationListener(id, this.InteractWithObject);
+                                _controller.SetObjectInteractionListener(id, this.InteractWithObject);
                             } else {
-                                _controller.SetInvestigationListener(id, null);
+                                _controller.SetObjectInteractionListener(id, null);
                             }
                         }
                         break;
@@ -144,7 +165,7 @@ namespace GameService.ServerProxy {
                                 }
                             }
                             for (int i = 0; i < msg.objectsID.Length; ++i) {
-                                int id = IdentificationConverter.GetID(msg.objectsID[i]);
+                                int id = msg.objectsID[i].value;
                                 var objAnimation = msg.objectsAnimation[i];
                                 var obj = _objectList[id];
                                 if (obj.RepeatingAnimation && objAnimation.repeatEndTime >= 0) {
@@ -167,53 +188,58 @@ namespace GameService.ServerProxy {
                         }
                         break;
                     case StorySceneEnterStoryModeMessage.MESSAGE_TYPE: {
+                            _controller.DisableFreedomCameraView();
+                            _controller.ShowDialog();
+                            _controller.DisableDialogTextInput();
                             _investigating = false;
                             _talker1 = null;
                             _talker2 = null;
-                            _controller.DisableInvestigationView();
-                            _controller.DisableTextInput();
                         }
                         break;
                     case StorySceneEnterTalkModeMessage.MESSAGE_TYPE: {
                             var msg = (StorySceneEnterTalkModeMessage)message;
-                            _talker1 = CharacterManager.Instance.FindCharacter(IdentificationConverter.GetID(msg.talkCharacter1));
-                            _talker2 = CharacterManager.Instance.FindCharacter(IdentificationConverter.GetID(msg.talkCharacter2));
+                            _talker1 = CharacterManager.Instance.FindCharacter(msg.talkCharacter1.value);
+                            _talker2 = CharacterManager.Instance.FindCharacter(msg.talkCharacter2.value);
                             _isTalker1Talking = msg.chara1Start;
-                            _controller.DisableInvestigationView();
+                            _controller.DisableFreedomCameraView();
+                            _controller.ShowDialog();
                             if ((_isTalker1Talking && _talker1.Controller == GameServerProxy.Instance.Self)
-                            || (!_isTalker1Talking && _talker2.Controller == GameServerProxy.Instance.Self)) {
-                                _controller.EnabledTextInput();
+                                || (!_isTalker1Talking && _talker2.Controller == GameServerProxy.Instance.Self)) {
+                                _controller.EnabledDialogTextInput(InputDialogText);
                             } else {
-                                _controller.DisableTextInput();
+                                _controller.DisableDialogTextInput();
                             }
                         }
                         break;
                     case StorySceneTurnTalkMessage.MESSAGE_TYPE: {
                             _isTalker1Talking = !_isTalker1Talking;
                             if ((_isTalker1Talking && _talker1.Controller == GameServerProxy.Instance.Self)
-                            || (!_isTalker1Talking && _talker2.Controller == GameServerProxy.Instance.Self))  {
-                                _controller.EnabledTextInput();
+                                || (!_isTalker1Talking && _talker2.Controller == GameServerProxy.Instance.Self))  {
+                                _controller.EnabledDialogTextInput(InputDialogText);
                             } else {
-                                _controller.DisableTextInput();
+                                _controller.DisableDialogTextInput();
                             }
                         }
                         break;
                     case StorySceneEnterInvestigationModeMessage.MESSAGE_TYPE: {
                             var msg = (StorySceneEnterInvestigationModeMessage)message;
-                            var userID = IdentificationConverter.GetID(msg.investigatingPlayer);
+                            int userID = msg.investigatingPlayer.value;
                             if (userID == GameServerProxy.Instance.Self.ID) {
                                 _investigating = true;
-                                _controller.EnabledInvestigationView();
+                                _controller.EnabledFreedomCameraView(new Vec2(0, 0), 540);
+                                _controller.DisableDialogTextInput();
+                                _controller.HideDialog();
+                                _controller.HideSelections();
                             } else {
                                 _investigating = false;
-                                _controller.DisableInvestigationView();
+                                _controller.DisableFreedomCameraView();
                             }
                         }
                         break;
                     case StorySceneShowSelectionsMessage.MESSAGE_TYPE: {
                             var msg = (StorySceneShowSelectionsMessage)message;
                             _selectionShowed = true;
-                            _controller.ShowSelections(msg.selections);
+                            _controller.ShowSelections(msg.selections, SelectSelection);
                         }
                         break;
                     case StorySceneHideSelectionsMessage.MESSAGE_TYPE: {
@@ -223,15 +249,15 @@ namespace GameService.ServerProxy {
                         break;
                     case StorySceneShowSelectionVoterMessage.MESSAGE_TYPE: {
                             var msg = (StorySceneShowSelectionVoterMessage)message;
-                            var voter = GameServerProxy.Instance.FindUser(IdentificationConverter.GetID(msg.voterID));
-                            _controller.SetSelectionVoter(msg.selectionIndex, voter);
+                            var voter = GameServerProxy.Instance.FindUser(msg.voterID.value);
+                            _controller.DisplaySelectionVoter(msg.selectionIndex, voter.Avatar);
                         }
                         break;
                     case StorySceneUpdateDialogMessage.MESSAGE_TYPE: {
                             var msg = (StorySceneUpdateDialogMessage)message;
-                            int objID = IdentificationConverter.GetID(msg.portraitObjectID);
-                            _controller.SetDialogPortrait(objID);
-                            _controller.SetDialogText(msg.text, msg.isPrivate ? new Vec3(0.6f, 0.6f, 0.6f) : new Vec3(1.0f, 1.0f, 1.0f));
+                            int objID = msg.portraitObjectID.value;
+                            _controller.DisplayDialogPortrait(objID);
+                            _controller.DisplayDialogText(msg.text, msg.isPrivate ? new Vec3(0.6f, 0.6f, 0.6f) : new Vec3(1.0f, 1.0f, 1.0f));
                         }
                         break;
                 }

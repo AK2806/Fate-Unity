@@ -4,13 +4,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace FateUnity.UI {
+namespace FateUnity.Components.UI.ObjectList {
 	public sealed class ObjectListViewClosedEvent {
 		public bool close = true;
 		public Vector2Int[] selections = null;
 	}
 	
-	[RequireComponent(typeof(RectTransform))]
 	public sealed class ObjectListView : MonoBehaviour, IObjectListObserver {
 		public RectTransform content;
 		public ObjectListGroupView groupPrefab;

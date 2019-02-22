@@ -3,11 +3,12 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace FateUnity.UI {
+namespace FateUnity.Components.UI.ObjectList {
     public interface IListObject {
         string Name { get; }
         Sprite Image { get; }
         Vector2 ImagePos { get; }
+        float ImageScale { get; }
     }
 
     public interface IObjectListModel {
@@ -39,10 +40,12 @@ namespace FateUnity.UI {
         public string name;
         public Sprite image;
         public Vector2 imagePos;
+        public float imageScale;
 
         string IListObject.Name { get { return name; } }
         Sprite IListObject.Image { get { return image; } }
         Vector2 IListObject.ImagePos { get { return imagePos; } }
+        float IListObject.ImageScale { get { return imageScale; } }
     }
 
     public class DefaultObjectListModel<T> : IObjectListModel where T : IListObject {

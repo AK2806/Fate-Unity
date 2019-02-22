@@ -11,8 +11,15 @@ using Futilef;
 using ImgAttr = Futilef.GpController.ImgAttr;
 using CamAttr = Futilef.GpController.CamAttr;
 using UnityEngine;
+using UnityEngine.UI;
+using FateUnity.Script.UI;
+using FateUnity.Components.UI;
+using FateUnity.Components.UI.Chat;
+using FateUnity.Components.UI.Dice;
+using FateUnity.Components.UI.ObjectList;
+using FateUnity.Components.UI.StorySelection;
 
-namespace FateUnity.ClientComponentImpl.StoryScene {
+namespace FateUnity.Script.ClientComponentImpl {
     public class StorySceneController : MonoBehaviour, IStorySceneController {
         private static int ConvertEsType(EaseType easeType) {
             return (int)easeType;
@@ -20,48 +27,31 @@ namespace FateUnity.ClientComponentImpl.StoryScene {
 
         private sealed class ImgData {
             public readonly int id;
-            // Current Data
-            public AssetReference[] spriteGrp;
-            public bool repeating;
-            public GameCore.Vec2 pos;
-            public int zIdx;
-            /////////////////////////////
-            // Next animation settings
-            public LinkedList<ObjectAnimCommand> cmds;
-            public ObjectAnimCommand[] repeatCmds;
-            public float repeatStartOffsetTime;
-            public float repeatEndTime;
+            public bool repeating = false;
+            public AssetReference[] spriteGrp = null;
+            public GameCore.Vec2 pos = new GameCore.Vec2();
+            public int zIdx = 0;
 
             public ImgData(int id) {
                 this.id = id;
-                spriteGrp = null;
-                repeating = false;
-                pos = new GameCore.Vec2();
-                zIdx = 0;
-                cmds = null;
-                repeatCmds = null;
-                repeatStartOffsetTime = -1.0f;
-                repeatEndTime = -1.0f;
             }
+
+            /////////////////////////////
+            // Next animation settings
+            public LinkedList<ObjectAnimCommand> cmds = null;
+            public ObjectAnimCommand[] repeatCmds = null;
+            public float repeatStartOffsetTime = -1.0f;
+            public float repeatEndTime = -1.0f;
         }
 
         private sealed class CamData {
-            // Current Data
-            public bool repeating;
-            /////////////////////////////
+            public bool repeating = false;
+            
             // Next animation settings
-            public LinkedList<CameraAnimCommand> cmds;
-            public CameraAnimCommand[] repeatCmds;
-            public float repeatStartOffsetTime;
-            public float repeatEndTime;
-
-            public CamData() {
-                repeating = false;
-                cmds = null;
-                repeatCmds = null;
-                repeatStartOffsetTime = -1.0f;
-                repeatEndTime = -1.0f;
-            }
+            public LinkedList<CameraAnimCommand> cmds = null;
+            public CameraAnimCommand[] repeatCmds = null;
+            public float repeatStartOffsetTime = -1.0f;
+            public float repeatEndTime = -1.0f;
         }
 
         private struct DelayedFuncCall {
@@ -73,35 +63,61 @@ namespace FateUnity.ClientComponentImpl.StoryScene {
 
         private readonly Queue<DelayedFuncCall> _funcQueue = new Queue<DelayedFuncCall>();
         private readonly Dictionary<int, ImgData> _imgDict = new Dictionary<int, ImgData>();
+        private readonly HashSet<int> _interactableIDs = new HashSet<int>();
         private CamData _cameraData = new CamData();
-        private HashSet<int> _interactableIDs = new HashSet<int>();
-
         private GpController _gpc = null;
-        public Camera mainCamera;
+        private bool _cameraFreedom = false;
 
-        private void Start() {
-            _gpc = new GpController(mainCamera);
+        public StorySceneDialog dialog;
+        public StorySelectionList selectionList;
+
+        private void Awake() {
 		    GameServerProxy.Instance.StoryScene.BindController(this);
+        }
+
+        private void OnEnable() {
+            _gpc = new GpController(Camera.main);
+            _funcQueue.Clear();
+            _imgDict.Clear();
+            _interactableIDs.Clear();
+            _cameraData = new CamData();
+            _cameraFreedom = false;
+            dialog.Show();
+            selectionList.Hide();
+        }
+
+        private void OnDisable() {
+            if (_gpc != null) _gpc.Dispose();
+            _funcQueue.Clear();
+            _imgDict.Clear();
+            _interactableIDs.Clear();
+            _cameraData = new CamData();
+            _cameraFreedom = false;
+            dialog.Hide();
+            selectionList.Hide();
         }
 
         private void Update() {
             float deltaTime = Time.deltaTime;
-            if (!_gpc.IsWorking()) {
-                while (_funcQueue.Count > 0) {
-                    var delayedCall = _funcQueue.Dequeue();
-                    switch (delayedCall.FuncType) {
-                        case DelayedFuncCall.ClearObjects:  ExecuteClearObjects(); break;
-                        case DelayedFuncCall.AddObject:     ExecuteAddObject((int)delayedCall.parameters[0], (AssetReference[])delayedCall.parameters[1]); break;
-                        case DelayedFuncCall.RemoveObject:  ExecuteRemoveObject((int)delayedCall.parameters[0]); break;
+            if (_gpc != null) {
+                if (!_gpc.IsWorking()) {
+                    while (_funcQueue.Count > 0) {
+                        var delayedCall = _funcQueue.Dequeue();
+                        switch (delayedCall.FuncType) {
+                            case DelayedFuncCall.ClearObjects:  ExecuteClearObjects(); break;
+                            case DelayedFuncCall.AddObject:     ExecuteAddObject((int)delayedCall.parameters[0], (AssetReference[])delayedCall.parameters[1]); break;
+                            case DelayedFuncCall.RemoveObject:  ExecuteRemoveObject((int)delayedCall.parameters[0]); break;
+                        }
                     }
                 }
+                _gpc.Update(deltaTime);
             }
-            _gpc.Update(deltaTime);
         }
 
         private void ExecuteClearObjects() {
             _gpc.RmImg(-1);
             _imgDict.Clear();
+            _interactableIDs.Clear();
         }
 
         private void ExecuteAddObject(int id, AssetReference[] spriteGroup) {
@@ -112,43 +128,52 @@ namespace FateUnity.ClientComponentImpl.StoryScene {
         private void ExecuteRemoveObject(int id) {
             _gpc.RmImg(id);
             _imgDict.Remove(id);
+            _interactableIDs.Remove(id);
         }
 
         public void ClearObjects() {
+            if (_gpc == null) return;
             _funcQueue.Enqueue(new DelayedFuncCall { FuncType = DelayedFuncCall.ClearObjects });
         }
 
         public void AddObject(int id, AssetReference[] spriteGroup) {
+            if (_gpc == null) return;
             _funcQueue.Enqueue(new DelayedFuncCall { FuncType = DelayedFuncCall.AddObject, parameters = new object[] { id, spriteGroup } });
         }
 
         public void RemoveObject(int id) {
+            if (_gpc == null) return;
             _funcQueue.Enqueue(new DelayedFuncCall { FuncType = DelayedFuncCall.RemoveObject, parameters = new object[] { id } });
         }
         
         public void SetCameraAnimation(CameraAnimCommand[] cameraAnimation) {
+            if (_gpc == null) return;
             if (_cameraData.repeating && _cameraData.repeatEndTime < 0) return;
             _cameraData.cmds = new LinkedList<CameraAnimCommand>(cameraAnimation);
         }
 
         public void SetObjectAnimation(int id, ObjectAnimCommand[] objectAnimation) {
+            if (_gpc == null) return;
             var imgData = _imgDict[id];
             if (imgData.repeating && imgData.repeatEndTime < 0) return;
             imgData.cmds = new LinkedList<ObjectAnimCommand>(objectAnimation);
         }
 
         public void SetCameraNextRepeatStartAfter(CameraAnimCommand[] repeatAnimation, float offsetTime) {
+            if (_gpc == null) return;
             if (_cameraData.repeating && _cameraData.repeatEndTime < 0) return;
             _cameraData.repeatCmds = repeatAnimation;
             _cameraData.repeatStartOffsetTime = offsetTime;
         }
 
         public void SetCameraCurrentRepeatStopAt(float endTime) {
+            if (_gpc == null) return;
             if (!_cameraData.repeating) return;
             _cameraData.repeatEndTime = endTime;
         }
 
         public void SetObjectNextRepeatStartAfter(int id, ObjectAnimCommand[] repeatAnimation, float offsetTime) {
+            if (_gpc == null) return;
             var imgData = _imgDict[id];
             if (imgData.repeating && imgData.repeatEndTime < 0) return;
             imgData.repeatCmds = repeatAnimation;
@@ -156,12 +181,15 @@ namespace FateUnity.ClientComponentImpl.StoryScene {
         }
 
         public void SetObjectCurrentRepeatStopAt(int id, float endTime) {
+            if (_gpc == null) return;
             var imgData = _imgDict[id];
             if (!imgData.repeating) return;
             imgData.repeatEndTime = endTime;
         }
         
         public void PlayAnimations() {
+            if (_gpc == null) return;
+            if (_cameraFreedom) _cameraData = new CamData();
             _gpc.Wait(-1);
             float leastOffset = 0.0f, offsetCrop;
             while (leastOffset != Mathf.Infinity) {
@@ -344,7 +372,8 @@ namespace FateUnity.ClientComponentImpl.StoryScene {
 						break;
 					case ObjectAttrType.Sprite: {
 							var easeSpriteCmd = (EaseObjectSprite)easeCmd;
-                            _gpc.SetImgAttr(id, ImgAttr.Position, (int)easeSpriteCmd.spriteIndex);
+                            var imgData = _imgDict[id];
+                            _gpc.SetImgAttr(id, ImgAttr.Position, (int)imgData.spriteGrp[easeSpriteCmd.spriteIndex].uid);
 						}
 						break;
 				}
@@ -388,7 +417,8 @@ namespace FateUnity.ClientComponentImpl.StoryScene {
 						break;
 					case ObjectAttrType.Sprite: {
 							var setSpriteCmd = (SetObjectSprite)setCmd;
-                            _gpc.SetImgAttr(id, ImgAttr.Position, (int)setSpriteCmd.spriteIndex);
+                            var imgData = _imgDict[id];
+                            _gpc.SetImgAttr(id, ImgAttr.Position, (int)imgData.spriteGrp[setSpriteCmd.spriteIndex].uid);
 						}
 						break;
 				}
@@ -396,10 +426,11 @@ namespace FateUnity.ClientComponentImpl.StoryScene {
         }
 
         public void CompleteAnimations() {
+            if (_gpc == null) return;
             _gpc.Skip();
         }
 
-        private void SetInteractCallback(int id, Action<int> callback) {
+        private void SetObjectCallback(int id, Action<int> callback) {
             if (callback == null) _gpc.SetImgInteractable(id, null);
             else _gpc.SetImgInteractable(id, (phase, x, y) => {
                 Debug.LogFormat("hit img1: phase {0}, x {1}, y {2}", phase, x, y);
@@ -407,66 +438,73 @@ namespace FateUnity.ClientComponentImpl.StoryScene {
             });
         }
 
-        public void ClearInvestigationListeners() {
+        public void ClearObjectInteractionListeners() {
+            if (_gpc == null) return;
             foreach (int id in _interactableIDs) {
-                SetInteractCallback(id, null);
+                SetObjectCallback(id, null);
             }
             _interactableIDs.Clear();
         }
         
-        public void SetInvestigationListener(int id, Action<int> callback) {
+        public void SetObjectInteractionListener(int id, Action<int> callback) {
+            if (_gpc == null) return;
             if (!_interactableIDs.Contains(id)) _interactableIDs.Add(id);
-            else if (callback == null) _interactableIDs.Remove(id);
-            SetInteractCallback(id, callback);
+            SetObjectCallback(id, callback);
         }
         
-        public void EnabledInvestigationView() {
-            
+        public void EnabledFreedomCameraView(GameCore.Vec2 camPos, float camZoom) {
+            if (_gpc == null) return;
+            _cameraFreedom = true;
+            _gpc.Wait(-1);
+            if (_gpc.IsRepeatIDAllocated(0)) _gpc.StopRepeat(0);
+            _gpc.SetCamAttr(CamAttr.Position, (float)camPos.X, (float)camPos.Y);
+            _gpc.SetCamAttr(CamAttr.Zoom, (float)camZoom);
         }
         
-        public void DisableInvestigationView() {
-
+        public void DisableFreedomCameraView() {
+            if (_gpc == null) return;
+            _cameraFreedom = false;
         }
 
-        public void ClearDialog() {
-
+        public void ShowDialog() {
+            dialog.Show();
         }
 
-        public void SetDialogText(string text, GameCore.Vec3 color) {
-
-        }
-
-        public void SetDialogPortrait(int objID) {// -1 is clear
-
-        }
-
-        public void SetTextInputListener(Action<string, IList<User>> callback) {
-
-        }
-
-        public void EnabledTextInput() {
-
+        public void HideDialog() {
+            dialog.Hide();
         }
         
-        public void DisableTextInput() {
-            
+        public void DisplayDialogText(string text, GameCore.Vec3 color) {
+            dialog.SetTextColor(new Color(color.X, color.Y, color.Z));
+            dialog.DisplayText(text);
+        }
+
+        public void DisplayDialogPortrait(int objID) {// -1 is clear
+            if (objID == -1) {
+                dialog.ClearPortrait();
+            } else {
+                
+            }
+        }
+
+        public void EnabledDialogTextInput(Action<string> callback) {
+            dialog.EnabledTextInput(callback);
+        }
+
+        public void DisableDialogTextInput() {
+            dialog.DisableTextInput();
         }
 
         public void HideSelections() {
-
+            selectionList.Hide();
         }
 
-        public void ShowSelections(string[] selections) {
-
+        public void ShowSelections(string[] selections, Action<int> callback) {
+            selectionList.Show(selections, callback);
         }
 
-        public void SetSelectListener(Action<int> callback) {
-
+        public void DisplaySelectionVoter(int selectionIdx, AssetReference userAvatar) {
+            
         }
-
-        public void SetSelectionVoter(int selectionIdx, User user) {
-
-        }
-
     }
 }

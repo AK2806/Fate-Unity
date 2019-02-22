@@ -12,12 +12,18 @@ namespace GameCore {
 		HINDER = 4
 	}
 
-	public enum CharacterToken {
+	public enum CharacterSituationToken {
 		PLAYER,
 		FRIENDLY,
 		NEUTRAL,
 		NEUTRAL_HOSTILE,
 		HOSTILE
+	}
+
+	public enum CharacterClassToken {
+		CREATURE,
+		ITEM,
+		ENVIRONMENT
 	}
 
 	public enum CheckResult {
@@ -133,27 +139,6 @@ namespace GameCore {
 		}
 	}
 
-	public struct UserInfo : IStreamable {
-		public bool dm;
-		public string id;
-		public string name;
-		public Guid avatar;
-
-		public void ReadFrom(IDataInputStream stream) {
-			dm = stream.ReadBoolean();
-			id = stream.ReadString();
-			name = stream.ReadString();
-			avatar = InputStreamHelper.ReadGuid(stream);
-		}
-
-		public void WriteTo(IDataOutputStream stream) {
-			stream.WriteBoolean(dm);
-			stream.WriteString(id);
-			stream.WriteString(name);
-			OutputStreamHelper.WriteGuid(stream, avatar);
-		}
-	}
-
 	public struct Description : IStreamable {
 		public string name;
 		public string text;
@@ -170,28 +155,59 @@ namespace GameCore {
 	}
 
 	public struct AssetReference : IStreamable {
+		public bool isExternal;
 		public int uid;
+		public Guid guid;
 
 		public void ReadFrom(IDataInputStream stream) {
-			uid = stream.ReadInt32();
+			isExternal = stream.ReadBoolean();
+			if (isExternal) {
+				guid = InputStreamHelper.ReadGuid(stream);
+			} else {
+				uid = stream.ReadInt32();
+			}
 		}
 
 		public void WriteTo(IDataOutputStream stream) {
-			stream.WriteInt32(uid);
+			stream.WriteBoolean(isExternal);
+			if (isExternal) {
+				OutputStreamHelper.WriteGuid(stream, guid);
+			} else {
+				stream.WriteInt32(uid);
+			}
+		}
+	}
+	
+	public struct RuntimeId : IStreamable {
+		public int value;
+
+		public void ReadFrom(IDataInputStream stream) {
+			value = stream.ReadInt32();
+		}
+
+		public void WriteTo(IDataOutputStream stream) {
+			stream.WriteInt32(value);
 		}
 	}
 
-	namespace Proxy {
-		public struct Identification : IStreamable {
-			public int value;
+	public struct UserInfo : IStreamable {
+		public bool isDM;
+		public string id;
+		public string name;
+		public AssetReference avatar;
 
-			public void ReadFrom(IDataInputStream stream) {
-				value = stream.ReadInt32();
-			}
+		public void ReadFrom(IDataInputStream stream) {
+			isDM = stream.ReadBoolean();
+			id = stream.ReadString();
+			name = stream.ReadString();
+			avatar.ReadFrom(stream);
+		}
 
-			public void WriteTo(IDataOutputStream stream) {
-				stream.WriteInt32(value);
-			}
+		public void WriteTo(IDataOutputStream stream) {
+			stream.WriteBoolean(isDM);
+			stream.WriteString(id);
+			stream.WriteString(name);
+			avatar.WriteTo(stream);
 		}
 	}
 
@@ -364,8 +380,6 @@ namespace GameCore {
 	}
 
 	namespace BattleScene {
-		using Proxy;
-
 		public enum BattleMapDirection {
 			POSITIVE_ROW = 1,
 			POSITIVE_COL = 2,
@@ -443,7 +457,7 @@ namespace GameCore {
 				}
 			}
 
-			public Identification id;
+			public RuntimeId id;
 			public int row;
 			public int col;
 			public bool obstacle;
@@ -483,7 +497,7 @@ namespace GameCore {
 		}
 
 		public struct LadderObjectData : IStreamable {
-			public Identification id;
+			public RuntimeId id;
 			public int row;
 			public int col;
 			public int stagnate;

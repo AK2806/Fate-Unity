@@ -2,7 +2,12 @@
 using UnityEngine.UI;
 using Futilef;
 using System.Collections;
-using FateUnity.UI;
+using FateUnity.Script.UI;
+using FateUnity.Components.UI;
+using FateUnity.Components.UI.Chat;
+using FateUnity.Components.UI.Dice;
+using FateUnity.Components.UI.ObjectList;
+using FateUnity.Components.UI.StorySelection;
 
 using ImgAttr = Futilef.GpController.ImgAttr;
 
@@ -15,7 +20,8 @@ public class Example : MonoBehaviour {
 
 	public Text text;
 	public Image image;
-	public ObjectListView listViewPrefab;
+	public PlayerStatus playerStatus;
+	public StorySceneDialog dialog;
 
  	DefaultObjectListModel<DefaultListObject> model = new DefaultObjectListModel<DefaultListObject>();
 
@@ -32,10 +38,16 @@ public class Example : MonoBehaviour {
 	}
 
 	IEnumerator Test() {
-		yield return new WaitForSeconds(15.0f);
-		model.RemoveItemAt(0, 0);
+		float percent = 0.0f;
+		playerStatus.DisplayProgress(true);
+		while (percent < 1.0f) {
+			playerStatus.SetProgress(percent);
+			yield return new WaitForSeconds(0.1f);
+			percent += 0.01f;
+		}
+		/*model.RemoveItemAt(0, 0);
 		model.AddItem(new DefaultListObject() { name = "布鲁特", image = image.sprite }, 1);
-		Debug.Log("List modified.");
+		Debug.Log("List modified."); */
 	}
 
 	void OnEnable() {
@@ -119,7 +131,7 @@ public class Example : MonoBehaviour {
 		gpc.SetImgAttrEased(6, ImgAttr.Alpha, 0.5f, EsType.Linear, 1.0f);
 		gpc.SetImgAttrEased(4, ImgAttr.Alpha, 0.5f, EsType.Linear, 1.0f);
 		gpc.RepeatDeclareEnd(0);
-
+/*
 		gpc.Wait(0.7f);
 		gpc.RmImg(4);
 
@@ -129,12 +141,22 @@ public class Example : MonoBehaviour {
 
 		gpc.Wait(5.0f);
 		gpc.RmImg(-1);
-		
-		image.sprite = Res.CreateSprite(1);
+		 */
+		var testSprite = Res.CreateSprite(1);
+		image.sprite = testSprite;
 		image.SetNativeSize();
 		StartCoroutine(TextAnimChange());
 		StartCoroutine(Test());
-
+		playerStatus.ShowChatText("你好");
+/*
+		selectionList.Show(new string[] {"左转", "右转", "什么都不做", "测试1", "测试2", "测试3"}, idx => Debug.Log(idx));
+		selectionList.ShowVoter(0, 0, testSprite, new Vector2(20, -236), 0.3f);
+		 */
+/*
+		diceGroup.DisplayPoints(new int[] {1, 0, -1, 0});
+		chatBubble.SetChatText("你好"); */
+		dialog.EnabledTextInput(text => Debug.Log(text));
+/*
 		var listView = Instantiate(listViewPrefab);
 		listView.BindModel(model);
 		model.AddGroup("分类 A");
@@ -146,6 +168,7 @@ public class Example : MonoBehaviour {
 		model.AddItem(new DefaultListObject() { name = "干员", image = Res.CreateSprite(6) });
 		model.AddItem(new DefaultListObject() { name = "???", image = Res.CreateSprite(4) }, 1);
 		model.MultipleChosen = true;
+		 */
 		/*
 		gpc.Wait(0.8f);
 		gpc.SetImgAttrEased(1, ImgAttr.Tint, 0.5f, EsType.CubicOut, 1.0f, 1.0f, 1.0f);
@@ -232,8 +255,13 @@ public class Example : MonoBehaviour {
 	}
 	void Update() {
 		if (gpc != null) gpc.Update(Time.deltaTime);
+		/*
+		if (Input.touchCount > 0) {
+			var touch = Input.GetTouch(0);
+			Debug.Log(touch.position);
+		} */
 	}
-	 
+	
 	void OnDisable() {
 		Debug.Log("Clean up ");
 		if (gpc != null) gpc.Dispose();

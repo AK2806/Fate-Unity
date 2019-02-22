@@ -2,19 +2,20 @@
 using System.Collections.Generic;
 using GameCore.Network;
 using GameService.ServerProxy;
-using FateUnity.ClientComponentImpl;
-using FateUnity.ClientComponentImpl.StoryScene;
+using FateUnity.Script.ClientComponentImpl;
 using UnityEngine;
 
-public sealed class MainGame : MonoBehaviour {
-
-	// Use this for initialization
-	private void Start () {
+namespace FateUnity.Script {
+	public sealed class MainGame : MonoBehaviour {
+		// Use this for initialization
+		private void Start () {
+			
+		}
 		
+		// Update is called once per frame
+		private void Update () {
+			GameServerProxy.Instance.ExecuteServerCommands();
+		}
 	}
-	
-	// Update is called once per frame
-	private void Update () {
-		GameServerProxy.Instance.ExecuteServerCommands();
-	}
+
 }

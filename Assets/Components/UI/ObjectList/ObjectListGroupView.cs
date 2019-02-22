@@ -4,8 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace FateUnity.UI {
-	[RequireComponent(typeof(RectTransform))]
+namespace FateUnity.Components.UI.ObjectList {
 	public sealed class ObjectListGroupView : MonoBehaviour {
 		public RectTransform title;
 		public RectTransform content;
@@ -69,7 +68,7 @@ namespace FateUnity.UI {
 			var item = Instantiate(itemPrefab);
 			item.transform.SetParent(content, false);
 			item.UpdateView(obj);
-			item.AddClickListener(() => _listView.ClickItem(_listView.IndexOfGroupView(this), IndexOfItemView(item)));
+			item.SetClickListener(() => _listView.ClickItem(_listView.IndexOfGroupView(this), IndexOfItemView(item)));
 			_items.Insert(idx, item);
 			UpdateLayout(idx);
 			if (_folded) item.gameObject.SetActive(false);

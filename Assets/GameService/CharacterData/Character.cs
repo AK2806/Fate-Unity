@@ -11,7 +11,8 @@ namespace GameService.CharacterData {
 		private readonly AssetReference _avatar;
 		private User _controller = null;
 		private bool _destroyed = false;
-		private CharacterToken _token = CharacterToken.NEUTRAL;
+		private CharacterSituationToken _situationToken = CharacterSituationToken.NEUTRAL;
+		private CharacterClassToken _classToken = CharacterClassToken.ITEM;
 		private Extra _belong = null;
 
 		private int _refreshPoint = 0;
@@ -34,7 +35,8 @@ namespace GameService.CharacterData {
 		public AssetReference Avatar { get { return _avatar; } }
 		public User Controller { get { return _controller; } set { _controller = value; } }
 		public bool Destroyed { get { return _destroyed; } set { _destroyed = value; } }
-		public CharacterToken Token { get { return _token; } set { _token = value; } }
+		public CharacterSituationToken SituationToken { get { return _situationToken; } set { _situationToken = value; } }
+		public CharacterClassToken ClassToken { get { return _classToken; } set { _classToken = value; } }
 		public Extra Belong { get { return _belong; } }
 
 		public int RefreshPoint { get { return _refreshPoint; } set { _refreshPoint = value; } }

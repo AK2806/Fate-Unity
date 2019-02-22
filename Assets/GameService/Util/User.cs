@@ -7,14 +7,14 @@ namespace GameService.Util {
 		private readonly int _id;
 		private readonly string _accountID;
 		private readonly string _name;
-		private readonly Guid _avatar;
+		private readonly AssetReference _avatar;
 		private readonly int _characterID;
 		private Character _characterRef = null;
 		
 		public int ID { get { return _id; } }
 		public string AccountID { get { return _accountID; } }
 		public string Name { get { return _name; } }
-		public Guid Avatar { get { return _avatar; } }
+		public AssetReference Avatar { get { return _avatar; } }
 		public Character Character { get { return _characterRef ?? (_characterID != -1 ? _characterRef = CharacterManager.Instance.FindCharacter(_characterID) : null); } }
 		public bool IsDM { get { return _characterID == -1; } }
 
@@ -23,7 +23,7 @@ namespace GameService.Util {
 			_accountID = userInfo.id;
 			_name = userInfo.name;
 			_avatar = userInfo.avatar;
-			if (userInfo.dm) characterID = -1;
+			if (userInfo.isDM) characterID = -1;
 			else _characterID = characterID;
 		}
 

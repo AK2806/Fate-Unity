@@ -43,7 +43,7 @@ namespace GameService.ServerProxy {
                         var msg = (SyncAbilityTypeListMessage)message;
                         AbilityType.AbilityTypes.Clear();
                         foreach (var typeInfo in msg.abilityTypes) {
-                            var abilityType = new AbilityType(IdentificationConverter.GetID(typeInfo.id), typeInfo.name);
+                            var abilityType = new AbilityType(typeInfo.id.value, typeInfo.name);
                             AbilityType.AbilityTypes.Add(abilityType.ID, abilityType);
                         }
                     }
@@ -51,7 +51,7 @@ namespace GameService.ServerProxy {
                 case CreateCharacterMessage.MESSAGE_TYPE: {
                         var msg = (CreateCharacterMessage)message;
                         var pool = CharacterManager.Instance.CharacterPool;
-                        var character = new Character(IdentificationConverter.GetID(msg.id), msg.avatar);
+                        var character = new Character(msg.id.value, msg.avatar);
                         character.Name = msg.description.name;
                         character.Description = msg.description.text;
                         pool.Add(character);
@@ -60,7 +60,7 @@ namespace GameService.ServerProxy {
                 case CreateTemporaryCharacterMessage.MESSAGE_TYPE: {
                         var msg = (CreateTemporaryCharacterMessage)message;
                         var pool = CharacterManager.Instance.TemporaryCharacterPool;
-                        var character = new Character(IdentificationConverter.GetID(msg.id), msg.avatar);
+                        var character = new Character(msg.id.value, msg.avatar);
                         character.Name = msg.description.name;
                         character.Description = msg.description.text;
                         pool.Add(character);
@@ -72,10 +72,11 @@ namespace GameService.ServerProxy {
                     break;
                 case UpdateCharacterBaseDataMessage.MESSAGE_TYPE: {
                         var msg = (UpdateCharacterBaseDataMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
                         character.Destroyed = msg.destroyed;
-                        character.Token = msg.token;
+                        character.SituationToken = msg.situationToken;
+                        character.ClassToken = msg.classToken;
                         character.FatePoint = msg.fatePoint;
                         character.RefreshPoint = msg.refreshPoint;
                         character.PhysicsStress = msg.physicsStress;
@@ -88,9 +89,9 @@ namespace GameService.ServerProxy {
                     break;
                 case UpdateCharacterAbilityDataMessage.MESSAGE_TYPE: {
                         var msg = (UpdateCharacterAbilityDataMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
-                        var abilityType = AbilityType.AbilityTypes[IdentificationConverter.GetID(msg.typeID)];
+                        var abilityType = AbilityType.AbilityTypes[msg.typeID.value];
                         character.Abilities[abilityType] = new AbilityData() {
                             customName = msg.customName,
                             level = msg.level,
@@ -100,9 +101,9 @@ namespace GameService.ServerProxy {
                     break;
                 case CharacterAddAspectMessage.MESSAGE_TYPE: {
                         var msg = (CharacterAddAspectMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
-                        var aspect = new Aspect(IdentificationConverter.GetID(msg.aspectID));
+                        var aspect = new Aspect(msg.aspectID.value);
                         aspect.Name = msg.description.name;
                         aspect.Description = msg.description.text;
                         character.Aspects.Add(aspect);
@@ -110,18 +111,18 @@ namespace GameService.ServerProxy {
                     break;
                 case CharacterRemoveAspectMessage.MESSAGE_TYPE: {
                         var msg = (CharacterRemoveAspectMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
-                        character.Aspects.Remove(IdentificationConverter.GetID(msg.aspectID));
+                        character.Aspects.Remove(msg.aspectID.value);
                     }
                     break;
                 case CharacterUpdateAspectDataMessage.MESSAGE_TYPE: {
                         var msg = (CharacterUpdateAspectDataMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
-                        var aspect = character.Aspects[IdentificationConverter.GetID(msg.aspectID)];
+                        var aspect = character.Aspects[msg.aspectID.value];
                         aspect.PersistenceType = msg.persistenceType;
-                        int benefiterID = IdentificationConverter.GetID(msg.benefiterID);
+                        int benefiterID = msg.benefiterID.value;
                         if (benefiterID == -1) aspect.Benefiter = null;
                         else aspect.Benefiter = CharacterManager.Instance.FindCharacter(benefiterID);
                         aspect.BenefitTimes = msg.benefitTimes;
@@ -129,16 +130,16 @@ namespace GameService.ServerProxy {
                     break;
                 case CharacterClearAspectListMessage.MESSAGE_TYPE: {
                         var msg = (CharacterClearAspectListMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
                         character.Aspects.Clear();
                     }
                     break;
                 case CharacterAddConsequenceMessage.MESSAGE_TYPE: {
                         var msg = (CharacterAddConsequenceMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
-                        var consequence = new Consequence(IdentificationConverter.GetID(msg.consequenceID));
+                        var consequence = new Consequence(msg.consequenceID.value);
                         consequence.Name = msg.description.name;
                         consequence.Description = msg.description.text;
                         character.Consequences.Add(consequence);
@@ -146,18 +147,18 @@ namespace GameService.ServerProxy {
                     break;
                 case CharacterRemoveConsequenceMessage.MESSAGE_TYPE: {
                         var msg = (CharacterRemoveConsequenceMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
-                        character.Consequences.Remove(IdentificationConverter.GetID(msg.consequenceID));
+                        character.Consequences.Remove(msg.consequenceID.value);
                     }
                     break;
                 case CharacterUpdateConsequenceMessage.MESSAGE_TYPE: {
                         var msg = (CharacterUpdateConsequenceMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
-                        var consequence = character.Consequences[IdentificationConverter.GetID(msg.consequenceID)];
+                        var consequence = character.Consequences[msg.consequenceID.value];
                         consequence.PersistenceType = msg.persistenceType;
-                        int benefiterID = IdentificationConverter.GetID(msg.benefiterID);
+                        int benefiterID = msg.benefiterID.value;
                         if (benefiterID == -1) consequence.Benefiter = null;
                         else consequence.Benefiter = CharacterManager.Instance.FindCharacter(benefiterID);
                         consequence.BenefitTimes = msg.benefitTimes;
@@ -168,16 +169,16 @@ namespace GameService.ServerProxy {
                     break;
                 case CharacterClearConsequenceListMessage.MESSAGE_TYPE: {
                         var msg = (CharacterClearConsequenceListMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
                         character.Consequences.Clear();
                     }
                     break;
                 case CharacterAddStuntMessage.MESSAGE_TYPE: {
                         var msg = (CharacterAddStuntMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
-                        var stunt = new Stunt(IdentificationConverter.GetID(msg.stuntID));
+                        var stunt = new Stunt(msg.stuntID.value);
                         stunt.Name = msg.description.name;
                         stunt.Description = msg.description.text;
                         character.Stunts.Add(stunt);
@@ -185,33 +186,33 @@ namespace GameService.ServerProxy {
                     break;
                 case CharacterRemoveStuntMessage.MESSAGE_TYPE: {
                         var msg = (CharacterRemoveStuntMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
-                        character.Stunts.Remove(IdentificationConverter.GetID(msg.stuntID));
+                        character.Stunts.Remove(msg.stuntID.value);
                     }
                     break;
                 case CharacterUpdateStuntMessage.MESSAGE_TYPE: {
                         var msg = (CharacterUpdateStuntMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
-                        var stunt = character.Stunts[IdentificationConverter.GetID(msg.stuntID)];
+                        var stunt = character.Stunts[msg.stuntID.value];
                         ///////////////////////////////////
                     }
                     break;
                 case CharacterClearStuntListMessage.MESSAGE_TYPE: {
                         var msg = (CharacterClearStuntListMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
                         character.Stunts.Clear();
                     }
                     break;
                 case CharacterAddExtraMessage.MESSAGE_TYPE: {
                         var msg = (CharacterAddExtraMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
-                        int itemID = IdentificationConverter.GetID(msg.boundCharacterID);
+                        int characterID = msg.characterID.value;
+                        int itemID = msg.boundCharacterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
                         var item = CharacterManager.Instance.FindCharacter(itemID);
-                        var extra = new Extra(IdentificationConverter.GetID(msg.extraID), item);
+                        var extra = new Extra(msg.extraID.value, item);
                         extra.Name = msg.description.name;
                         extra.Description = msg.description.text;
                         character.Extras.Add(extra);
@@ -219,23 +220,23 @@ namespace GameService.ServerProxy {
                     break;
                 case CharacterRemoveExtraMessage.MESSAGE_TYPE: {
                         var msg = (CharacterRemoveExtraMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
-                        character.Extras.Remove(IdentificationConverter.GetID(msg.extraID));
+                        character.Extras.Remove(msg.extraID.value);
                     }
                     break;
                 case CharacterUpdateExtraMessage.MESSAGE_TYPE: {
                         var msg = (CharacterUpdateExtraMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
-                        var extra = character.Extras[IdentificationConverter.GetID(msg.extraID)];
+                        var extra = character.Extras[msg.extraID.value];
                         extra.IsLongRangeWeapon = msg.isLongRangeWeapon;
                         extra.IsVehicle = msg.isVehicle;
                     }
                     break;
                 case CharacterClearExtraListMessage.MESSAGE_TYPE: {
                         var msg = (CharacterClearExtraListMessage)message;
-                        int characterID = IdentificationConverter.GetID(msg.characterID);
+                        int characterID = msg.characterID.value;
                         var character = CharacterManager.Instance.FindCharacter(characterID);
                         character.Extras.Clear();
                     }

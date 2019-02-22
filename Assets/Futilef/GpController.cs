@@ -185,14 +185,14 @@ namespace Futilef {
 		}
 
 		public bool IsWorking() {
-			return cmdQueue.Count > 0;
+			return cmdQueue.Count > 0 || time < lastEsEndTime || time < waitEndTime;
 		}
 
 		public void Skip() {
 			for (var node = esJobList.First; node != null;) {
 				var next = node.Next;
 				var job = node.Value;
-				if (job.repeatID == -1) {
+				if (job.repeatID < 0) {
 					job.Finish();
 					esJobList.Remove(node);
 				}
@@ -228,7 +228,14 @@ namespace Futilef {
 		}
 
 		public bool IsRepeatIDAllocated(int id) {
-			return repeatDict.ContainsKey(id);
+			bool beingAllocated = repeatDict.ContainsKey(id);
+			foreach (var cmd in cmdQueue) {
+				switch (cmd.GetType().Name) {
+					case "StartRepeatCmd":	if (id == (cmd as StartRepeatCmd).id) beingAllocated = true; break;
+					case "StopRepeatCmd":	if (id == (cmd as StopRepeatCmd).id || (cmd as StopRepeatCmd).id < 0) beingAllocated = false; break;
+				}
+			}
+			return beingAllocated;
 		}
 
 		void StartRepeat(StartRepeatCmd cmd) {
@@ -238,7 +245,7 @@ namespace Futilef {
 		}
 
 		void StopRepeat(StopRepeatCmd cmd, float deltaTime = -1.0f) {
-			if (cmd.id != -1) {
+			if (cmd.id >= 0) {
 				repeatDict.Remove(cmd.id);
 				for (var node = esJobList.First; node != null;) {
 					var next = node.Next;
@@ -254,7 +261,7 @@ namespace Futilef {
 				for (var node = esJobList.First; node != null;) {
 					var next = node.Next;
 					var job = node.Value;
-					if (job.repeatID != -1) {
+					if (job.repeatID >= 0) {
 						if (deltaTime >= 0) job.Apply(Es.Ease(job.esType, (job.time + deltaTime) / job.duration));
 						esJobList.Remove(node);
 					}

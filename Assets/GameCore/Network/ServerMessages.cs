@@ -2,7 +2,6 @@
 using GameCore.StoryScene;
 using GameCore.BattleScene;
 using System.Diagnostics;
-using GameCore.Proxy;
 using GameCore.StoryScene.AnimationCommand;
 
 namespace GameCore.Network.ServerMessages {
@@ -10,7 +9,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -1;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification playerID;
+		public RuntimeId playerID;
 
 		public override void ReadFrom(IDataInputStream stream) {
 			playerID.ReadFrom(stream);
@@ -25,7 +24,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -2;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification playerID;
+		public RuntimeId playerID;
 
 		public override void ReadFrom(IDataInputStream stream) {
 			playerID.ReadFrom(stream);
@@ -40,7 +39,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -3;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification playerID;
+		public RuntimeId playerID;
 		public byte percent;
 
 		public override void ReadFrom(IDataInputStream stream) {
@@ -58,7 +57,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -4;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification playerID;
+		public RuntimeId playerID;
 
 		public override void ReadFrom(IDataInputStream stream) {
 			playerID.ReadFrom(stream);
@@ -69,21 +68,21 @@ namespace GameCore.Network.ServerMessages {
 		}
 	}
 
-	public sealed class SyncUserListMessage : Message {
+	public sealed class SyncUsersInfoMessage : Message {
 		public const int MESSAGE_TYPE = -5;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification clientUserID;
-		public Identification[] usersID;
+		public RuntimeId clientUserID;
+		public RuntimeId[] usersID;
 		public UserInfo[] usersInfo;
-		public Identification[] charactersID;
+		public RuntimeId[] charactersID;
 
 		public override void ReadFrom(IDataInputStream stream) {
 			clientUserID.ReadFrom(stream);
 			int length = stream.ReadInt32();
-			usersID = new Identification[length];
+			usersID = new RuntimeId[length];
 			usersInfo = new UserInfo[length];
-			charactersID = new Identification[length];
+			charactersID = new RuntimeId[length];
 			for (int i = 0; i < length; ++i) {
 				usersID[i].ReadFrom(stream);
 			}
@@ -211,7 +210,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -8;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification senderID;
+		public RuntimeId senderID;
 		public bool isPrivate;
 		public string text;
 
@@ -228,13 +227,15 @@ namespace GameCore.Network.ServerMessages {
 		}
 	}
 
-	public sealed class ReloadAssetsMessage : Message {
+	public sealed class LoadAssetsMessage : Message {
 		public const int MESSAGE_TYPE = -9;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
+		public bool isFixed;
 		public AssetReference[] assets;
 
 		public override void ReadFrom(IDataInputStream stream) {
+			isFixed = stream.ReadBoolean();
 			int length = stream.ReadInt32();
 			assets = new AssetReference[length];
 			for (int i = 0; i < length; ++i) {
@@ -243,6 +244,7 @@ namespace GameCore.Network.ServerMessages {
 		}
 
 		public override void WriteTo(IDataOutputStream stream) {
+			stream.WriteBoolean(isFixed);
 			stream.WriteInt32(assets.Length);
 			foreach (var asset in assets) {
 				asset.WriteTo(stream);
@@ -269,7 +271,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -37;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification userID;
+		public RuntimeId userID;
 		public int[] dicePoints;
 
 		public override void WriteTo(IDataOutputStream stream) {
@@ -334,7 +336,7 @@ namespace GameCore.Network.ServerMessages {
 
 		public struct Node : IStreamable {
 			public AssetReference thumbnail;
-			public Identification id;
+			public RuntimeId id;
 			public string name;
 			public string description;
 
@@ -413,17 +415,17 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -71;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification initiativeID;
-		public Identification initiativeAbilityTypeID;
+		public RuntimeId initiativeID;
+		public RuntimeId initiativeAbilityTypeID;
 		public CharacterAction action;
-		public Identification[] targetsID;
+		public RuntimeId[] targetsID;
 
 		public override void ReadFrom(IDataInputStream stream) {
 			initiativeID.ReadFrom(stream);
 			initiativeAbilityTypeID.ReadFrom(stream);
 			action = (CharacterAction)stream.ReadByte();
 			int length = stream.ReadInt32();
-			targetsID = new Identification[length];
+			targetsID = new RuntimeId[length];
 			for (int i = 0; i < length; ++i) {
 				targetsID[i].ReadFrom(stream);;
 			}
@@ -444,7 +446,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -72;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification nextOneID;
+		public RuntimeId nextOneID;
 
 		public override void ReadFrom(IDataInputStream stream) {
 			nextOneID.ReadFrom(stream);
@@ -586,8 +588,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -67;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification[] abilityTypesID;
-		public Identification[] stuntsID;
+		public RuntimeId[] abilityTypesID;
+		public RuntimeId[] stuntsID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			stream.WriteInt32(abilityTypesID.Length);
@@ -602,12 +604,12 @@ namespace GameCore.Network.ServerMessages {
 
 		public override void ReadFrom(IDataInputStream stream) {
 			int length = stream.ReadInt32();
-			abilityTypesID = new Identification[length];
+			abilityTypesID = new RuntimeId[length];
 			for (int i = 0; i < length; ++i) {
 				abilityTypesID[i].ReadFrom(stream);
 			}
 			length = stream.ReadInt32();
-			stuntsID = new Identification[length];
+			stuntsID = new RuntimeId[length];
 			for (int i = 0; i < length; ++i) {
 				stuntsID[i].ReadFrom(stream);
 			}
@@ -652,7 +654,7 @@ namespace GameCore.Network.ServerMessages {
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
 		public bool isInitiative;
-		public Identification abilityTypeID;
+		public RuntimeId abilityTypeID;
 
 		public override void ReadFrom(IDataInputStream stream) {
 			isInitiative = stream.ReadBoolean();
@@ -669,8 +671,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -81;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification stuntID;
+		public RuntimeId characterID;
+		public RuntimeId stuntID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			characterID.WriteTo(stream);
@@ -688,8 +690,8 @@ namespace GameCore.Network.ServerMessages {
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
 		public bool isInitiative;
-		public Identification aspectOwnerID;
-		public Identification aspectID;
+		public RuntimeId aspectOwnerID;
+		public RuntimeId aspectID;
 
 		public override void ReadFrom(IDataInputStream stream) {
 			isInitiative = stream.ReadBoolean();
@@ -709,7 +711,7 @@ namespace GameCore.Network.ServerMessages {
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
 		public struct TypeInfo : IStreamable {
-			public Identification id;
+			public RuntimeId id;
 			public string name;
 
 			public void ReadFrom(IDataInputStream stream) {
@@ -745,7 +747,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -251;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification id;
+		public RuntimeId id;
 		public Description description;
 		public AssetReference avatar;
 
@@ -766,7 +768,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -252;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification id;
+		public RuntimeId id;
 		public Description description;
 		public AssetReference avatar;
 
@@ -795,10 +797,11 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -254;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification controllerID;
+		public RuntimeId characterID;
+		public RuntimeId controllerID;
 		public bool destroyed;
-		public CharacterToken token;
+		public CharacterSituationToken situationToken;
+		public CharacterClassToken classToken;
 		public int fatePoint;
 		public int refreshPoint;
 		public int physicsStress;
@@ -812,7 +815,7 @@ namespace GameCore.Network.ServerMessages {
 			characterID.ReadFrom(stream);
 			controllerID.ReadFrom(stream);
 			destroyed = stream.ReadBoolean();
-			token = (CharacterToken)stream.ReadByte();
+			situationToken = (CharacterSituationToken)stream.ReadByte();
 			fatePoint = stream.ReadInt32();
 			refreshPoint = stream.ReadInt32();
 			physicsStress = stream.ReadInt32();
@@ -827,7 +830,7 @@ namespace GameCore.Network.ServerMessages {
 			characterID.WriteTo(stream);
 			controllerID.WriteTo(stream);
 			stream.WriteBoolean(destroyed);
-			stream.WriteByte((byte)token);
+			stream.WriteByte((byte)situationToken);
 			stream.WriteInt32(fatePoint);
 			stream.WriteInt32(refreshPoint);
 			stream.WriteInt32(physicsStress);
@@ -843,8 +846,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -295;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification typeID;
+		public RuntimeId characterID;
+		public RuntimeId typeID;
 		public string customName;
 		public int level;
 		public bool damageMental;
@@ -870,8 +873,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -276;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification aspectID;
+		public RuntimeId characterID;
+		public RuntimeId aspectID;
 		public Description description;
 
 		public override void WriteTo(IDataOutputStream stream) {
@@ -891,8 +894,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -277;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification aspectID;
+		public RuntimeId characterID;
+		public RuntimeId aspectID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			characterID.WriteTo(stream);
@@ -909,10 +912,10 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -278;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification aspectID;
+		public RuntimeId characterID;
+		public RuntimeId aspectID;
 		public PersistenceType persistenceType;
-		public Identification benefiterID;
+		public RuntimeId benefiterID;
 		public int benefitTimes;
 
 		public override void WriteTo(IDataOutputStream stream) {
@@ -936,7 +939,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -279;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
+		public RuntimeId characterID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			characterID.WriteTo(stream);
@@ -951,8 +954,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -218;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification consequenceID;
+		public RuntimeId characterID;
+		public RuntimeId consequenceID;
 		public Description description;
 
 		public override void WriteTo(IDataOutputStream stream) {
@@ -972,8 +975,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -228;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification consequenceID;
+		public RuntimeId characterID;
+		public RuntimeId consequenceID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			characterID.WriteTo(stream);
@@ -990,10 +993,10 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -328;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification consequenceID;
+		public RuntimeId characterID;
+		public RuntimeId consequenceID;
 		public PersistenceType persistenceType;
-		public Identification benefiterID;
+		public RuntimeId benefiterID;
 		public int benefitTimes;
 		public int counteractLevel;
 		public int actualDamage;
@@ -1026,7 +1029,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -427;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
+		public RuntimeId characterID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			characterID.WriteTo(stream);
@@ -1041,8 +1044,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -530;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification stuntID;
+		public RuntimeId characterID;
+		public RuntimeId stuntID;
 		public Description description;
 
 		public override void WriteTo(IDataOutputStream stream) {
@@ -1062,8 +1065,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -630;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification stuntID;
+		public RuntimeId characterID;
+		public RuntimeId stuntID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			characterID.WriteTo(stream);
@@ -1080,8 +1083,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -730;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification stuntID;
+		public RuntimeId characterID;
+		public RuntimeId stuntID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			characterID.WriteTo(stream);
@@ -1098,7 +1101,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -827;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
+		public RuntimeId characterID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			characterID.WriteTo(stream);
@@ -1113,10 +1116,10 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -931;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification extraID;
+		public RuntimeId characterID;
+		public RuntimeId extraID;
 		public Description description;
-		public Identification boundCharacterID;
+		public RuntimeId boundCharacterID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			characterID.WriteTo(stream);
@@ -1137,8 +1140,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -310;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification extraID;
+		public RuntimeId characterID;
+		public RuntimeId extraID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			characterID.WriteTo(stream);
@@ -1155,8 +1158,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -311;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification extraID;
+		public RuntimeId characterID;
+		public RuntimeId extraID;
 		public bool isLongRangeWeapon;
 		public bool isVehicle;
 
@@ -1179,7 +1182,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -617;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
+		public RuntimeId characterID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			characterID.WriteTo(stream);
@@ -1194,7 +1197,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -32;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification[] abilityTypesID;
+		public RuntimeId[] abilityTypesID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			stream.WriteInt32(abilityTypesID.Length);
@@ -1205,7 +1208,7 @@ namespace GameCore.Network.ServerMessages {
 
 		public override void ReadFrom(IDataInputStream stream) {
 			int length = stream.ReadInt32();
-			abilityTypesID = new Identification[length];
+			abilityTypesID = new RuntimeId[length];
 			for (int i = 0; i < length; ++i) {
 				abilityTypesID[i].ReadFrom(stream);
 			}
@@ -1216,8 +1219,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -79;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification characterID;
-		public Identification[] stuntsID;
+		public RuntimeId characterID;
+		public RuntimeId[] stuntsID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			characterID.WriteTo(stream);
@@ -1230,7 +1233,7 @@ namespace GameCore.Network.ServerMessages {
 		public override void ReadFrom(IDataInputStream stream) {
 			characterID.ReadFrom(stream);
 			int length = stream.ReadInt32();
-			stuntsID = new Identification[length];
+			stuntsID = new RuntimeId[length];
 			for (int i = 0; i < length; ++i) {
 				stuntsID[i].ReadFrom(stream);
 			}
@@ -1249,8 +1252,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -3;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification objID;
-		public Identification characterID;
+		public RuntimeId objID;
+		public RuntimeId characterID;
 		public Portrait portrait;
 
 		public override void WriteTo(IDataOutputStream stream) {
@@ -1270,7 +1273,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -4;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification objID;
+		public RuntimeId objID;
 		
 		public override void WriteTo(IDataOutputStream stream) {
 			objID.WriteTo(stream);
@@ -1285,7 +1288,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -42;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification objID;
+		public RuntimeId objID;
 		public bool interactable;
 
 		public override void WriteTo(IDataOutputStream stream) {
@@ -1373,7 +1376,7 @@ namespace GameCore.Network.ServerMessages {
 			}
 		}
 
-		public Identification[] objectsID;
+		public RuntimeId[] objectsID;
 		public ObjectAnimation[] objectsAnimation;
 		public bool hasCameraAnimation;
 		public CameraAnimation cameraAnimation;
@@ -1395,7 +1398,7 @@ namespace GameCore.Network.ServerMessages {
 
 		public override void ReadFrom(IDataInputStream stream) {
 			int length = stream.ReadInt32();
-			objectsID = new Identification[length];
+			objectsID = new RuntimeId[length];
 			for (int i = 0; i < length; ++i) {
 				objectsID[i].ReadFrom(stream);
 			}
@@ -1430,8 +1433,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -91;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification talkCharacter1;
-		public Identification talkCharacter2;
+		public RuntimeId talkCharacter1;
+		public RuntimeId talkCharacter2;
 		public bool chara1Start;
 
 		public override void WriteTo(IDataOutputStream stream) {
@@ -1459,7 +1462,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -94;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification investigatingPlayer;
+		public RuntimeId investigatingPlayer;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			investigatingPlayer.WriteTo(stream);
@@ -1505,7 +1508,7 @@ namespace GameCore.Network.ServerMessages {
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
 		public int selectionIndex;
-		public Identification voterID;
+		public RuntimeId voterID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			stream.WriteInt32(selectionIndex);
@@ -1523,7 +1526,7 @@ namespace GameCore.Network.ServerMessages {
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
 		public bool isPrivate;
-		public Identification portraitObjectID;
+		public RuntimeId portraitObjectID;
 		public string text;
 
 		public override void WriteTo(IDataOutputStream stream) {
@@ -1561,7 +1564,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -49;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification gridObjID;
+		public RuntimeId gridObjID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			gridObjID.WriteTo(stream);
@@ -1594,7 +1597,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -51;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification ladderObjID;
+		public RuntimeId ladderObjID;
 
 		public override void WriteTo(IDataOutputStream stream) {
 			ladderObjID.WriteTo(stream);
@@ -1686,11 +1689,11 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -53;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification[] objsIDOrdered;
+		public RuntimeId[] objsIDOrdered;
 
 		public override void ReadFrom(IDataInputStream stream) {
 			int length = stream.ReadInt32();
-			objsIDOrdered = new Identification[length];
+			objsIDOrdered = new RuntimeId[length];
 			for (int i = 0; i < length; ++i) {
 				objsIDOrdered[i].ReadFrom(stream);
 			}
@@ -1708,7 +1711,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -54;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification objIDWhoseTurn;
+		public RuntimeId objIDWhoseTurn;
 		public bool canOperate;
 		
 		public override void ReadFrom(IDataInputStream stream) {
@@ -1781,7 +1784,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -61;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification objID;
+		public RuntimeId objID;
 		public BattleMapDirection direction;
 		public bool stairway;
 
@@ -1802,8 +1805,8 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -64;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification objID;
-		public Identification moveAbilityTypeID;
+		public RuntimeId objID;
+		public RuntimeId moveAbilityTypeID;
 		public int newMovePoint;
 
 		public override void ReadFrom(IDataInputStream stream) {
@@ -1823,7 +1826,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -65;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification objID;
+		public RuntimeId objID;
 		public int newActionPoint;
 
 		public override void ReadFrom(IDataInputStream stream) {
@@ -1841,7 +1844,7 @@ namespace GameCore.Network.ServerMessages {
 		public const int MESSAGE_TYPE = -70;
 		public override int MessageType { get { return MESSAGE_TYPE; } }
 
-		public Identification objID;
+		public RuntimeId objID;
 		public int newMovePoint;
 
 		public override void ReadFrom(IDataInputStream stream) {

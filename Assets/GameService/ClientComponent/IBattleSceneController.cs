@@ -8,6 +8,6 @@ using GameService.Util;
 
 namespace GameService.ClientComponent {
     public interface IBattleSceneController {
-        
+
     }
 }

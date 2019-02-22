@@ -4,22 +4,11 @@ using System.Collections.Generic;
 using GameService.CharacterData;
 using GameService.Util;
 using GameCore;
-using GameCore.Proxy;
 using GameCore.Network;
 using GameCore.Network.ServerMessages;
 using GameCore.Network.ClientMessages;
 
 namespace GameService.ServerProxy {
-	public static class IdentificationConverter {
-		public static int GetID(Identification id) {
-			return id.value;
-		}
-
-        public static Identification GetIdentification(IIdentifiable identifiable) {
-            return new Identification() { value = identifiable.ID };
-        }
-	}
-
     public abstract class ServerComponentProxy : IMessageReceiver {
 		private readonly Connection _connectionRef;
         protected Connection ConnectionRef { get { return _connectionRef; } }
@@ -43,6 +32,8 @@ namespace GameService.ServerProxy {
         private readonly StorySceneProxy _storyScene;
         private readonly BattleSceneProxy _battleScene;
 
+        
+
         public User Self { get { return _self; } }
         public StorySceneProxy StoryScene { get { return _storyScene; } }
         public BattleSceneProxy BattleScene { get { return _battleScene; } }
@@ -58,7 +49,7 @@ namespace GameService.ServerProxy {
             _characterData = new CharacterDataProxy(_connection);
             _storyScene = new StorySceneProxy(_connection);
             _battleScene = new BattleSceneProxy(_connection);
-            _connection.AddMessageReceiver(SyncUserListMessage.MESSAGE_TYPE, this);
+            _connection.AddMessageReceiver(SyncUsersInfoMessage.MESSAGE_TYPE, this);
         }
 
         public bool EstablishConnection(string ip, byte[] verificationCode) {
@@ -74,26 +65,28 @@ namespace GameService.ServerProxy {
             }
         }
 
-	    public void InitSync() {
+	    public void InitSyncData() {
 		    _connection.SendMessage(new ClientOnlineMessage());
 	    }
 
         public void MessageReceived(Message message) {
             switch (message.MessageType) {
-                case SyncUserListMessage.MESSAGE_TYPE: {
-                        var msg = (SyncUserListMessage)message;
+                case SyncUsersInfoMessage.MESSAGE_TYPE: {
+                        var msg = (SyncUsersInfoMessage)message;
                         for (int i = 0; i < msg.usersID.Length; ++i) {
-                            int userID = IdentificationConverter.GetID(msg.usersID[i]);
-                            int characterID = IdentificationConverter.GetID(msg.charactersID[i]);
+                            int userID = msg.usersID[i].value;
+                            int characterID = msg.charactersID[i].value;
                             var user = new User(userID, msg.usersInfo[i], characterID);
                             _users.Add(user);
                         }
-                        int clientUserID = IdentificationConverter.GetID(msg.clientUserID);
+                        int clientUserID = msg.clientUserID.value;
                         _self = _users[clientUserID];
+
                     }
                     break;
                 case UserOnlineMessage.MESSAGE_TYPE: {
-
+                        var msg = (UserOnlineMessage)message;
+                        
                     }
                     break;
                 case UserOfflineMessage.MESSAGE_TYPE: {
@@ -108,7 +101,8 @@ namespace GameService.ServerProxy {
 
                     }
                     break;
-                case ReloadAssetsMessage.MESSAGE_TYPE: {
+                case LoadAssetsMessage.MESSAGE_TYPE: {
+                        var msg = (LoadAssetsMessage)message;
 
                     }
                     break;

@@ -21,27 +21,29 @@ namespace GameService.ClientComponent {
         void SetCameraCurrentRepeatStopAt(float endTime);
         void SetObjectNextRepeatStartAfter(int id, ObjectAnimCommand[] repeatAnimation, float offsetTime);
         void SetObjectCurrentRepeatStopAt(int id, float endTime);
-        ////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////////////
 
         void PlayAnimations(); // Enqueue animation settings
         void CompleteAnimations(); // Skip animations in queue
-        
-        void ClearInvestigationListeners();
-        void SetInvestigationListener(int id, Action<int> callback);
+        //////////////////////////////////////////////////
 
-        void EnabledInvestigationView();
-        void DisableInvestigationView();
-        
-        void ClearDialog();
-        void SetDialogText(string text, Vec3 color);
-        void SetDialogPortrait(int objID); // -1 is reset
-        void SetTextInputListener(Action<string, IList<User>> callback);
-        void EnabledTextInput();
-        void DisableTextInput();
+        void ClearObjectInteractionListeners();
+        void SetObjectInteractionListener(int id, Action<int> callback);
 
+        void EnabledFreedomCameraView(Vec2 camPos, float camZoom); // allow to controll camera moving
+        void DisableFreedomCameraView();
+        ////////////////////////////////////////////////
+
+        void ShowDialog();
+        void HideDialog();
+        void DisplayDialogText(string text, Vec3 color);
+        void DisplayDialogPortrait(int objID); // -1 is clear
+        void EnabledDialogTextInput(Action<string> callback);
+        void DisableDialogTextInput();
+        /////////////////////////////////////////////////
+        
         void HideSelections();
-        void ShowSelections(string[] selections);
-        void SetSelectListener(Action<int> callback);
-        void SetSelectionVoter(int selectionIdx, User user);
+        void ShowSelections(string[] selections, Action<int> callback);
+        void DisplaySelectionVoter(int selectionIdx, AssetReference userAvatar);
     }
 }
