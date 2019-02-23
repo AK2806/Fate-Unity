@@ -14,38 +14,74 @@ namespace FateUnity.Script.UI {
 		public Text output;
 		public float outputTextInterval = 0.03f;
 
-		public StorySceneDialogInputField input;
-		private Action<string> _inputCallback = null;
+		public InputField input;
+		public Vector2 inputAnimatePositionOffset = new Vector2(0, 60.0f);
+		public float inputAnimateDuration = 0.2f;
+		private bool _inputActive = false;
+		private Vector2 _inputAnimatePos;
 		private Vector2 _touchBeginPoint = new Vector2(0, 0);
-		private bool _touchBeginOnThis = false;
+		private bool _touchBeginOnInput = false;
+		private Action<string> _inputFieldClosedCallback = null;
 
-		// Use this for initialization
-		private void Start() {
+		private void OnValidate() {
+			_inputAnimatePos = input.GetComponent<RectTransform>().anchoredPosition;
 			_portraitOriginPos = portrait.GetComponent<RectTransform>().anchoredPosition;
 		}
-		
+
 		// Update is called once per frame
 		private void Update() {
-			if (_inputCallback != null && !input.gameObject.activeSelf && Input.touchCount > 0) {
+			if (_inputFieldClosedCallback != null && Input.touchCount > 0) {
 				var touch = Input.GetTouch(0);
-				switch (touch.phase) {
-					case TouchPhase.Began: {
-							_touchBeginPoint = touch.position;
-							_touchBeginOnThis = UIHelper.IsPointerOnOverlayUI(input.GetComponent<RectTransform>(), touch.position);
-						}
-						break;
-					case TouchPhase.Ended: {
-							if (!_touchBeginOnThis) break;
+				if (touch.phase == TouchPhase.Began) {
+					_touchBeginPoint = touch.position;
+					_touchBeginOnInput = UIHelper.IsPointerOnOverlayUI(input.GetComponent<RectTransform>(), touch.position);
+				}
+				do {
+					if (touch.phase == TouchPhase.Ended) {
+						if (!_inputActive) {
+							if (!_touchBeginOnInput) break;
 							var direction = touch.position - _touchBeginPoint;
 							float percent = direction.y / Screen.height;
 							if (percent > 0.05f) {
+								var srcPos = _inputAnimatePos - inputAnimatePositionOffset;
+								var dstPos = _inputAnimatePos;
+								input.gameObject.SetActive(true);
 								input.GetComponent<InputField>().text = "";
-								input.SetClosedCallback(_inputCallback);
-								input.Show();
+								input.GetComponent<Image>().color = new Color(1, 1, 1, 0);
+								input.GetComponent<RectTransform>().anchoredPosition = srcPos;
+								var animator = input.GetComponent<UIAnimator>();
+								animator.AbortAllActions();
+								animator.DeclareConcurrentActionsBegin();
+								animator.EasePosition(dstPos, inputAnimateDuration);
+								animator.EaseColor(new Color(1, 1, 1, 1), inputAnimateDuration);
+								animator.DeclareConcurrentActionsEnd();
+								_inputActive = true;
 							}
+						} else {
+							var direction = touch.position - _touchBeginPoint;
+							float percent = direction.y / Screen.height;
+							var dstPos = _inputAnimatePos;
+							string result = null;
+							if (percent > 0.05f) {
+								if (!_touchBeginOnInput) break;
+								dstPos += inputAnimatePositionOffset;
+								result = input.GetComponent<InputField>().text;
+							} else if (percent < -0.05f) {
+								if (!UIHelper.IsPointerOnOverlayUI(input.GetComponent<RectTransform>(), touch.position)) break;
+								dstPos -= inputAnimatePositionOffset;
+							} else break;
+							var animator = input.GetComponent<UIAnimator>();
+							animator.SkipAllActions();
+							animator.DeclareConcurrentActionsBegin();
+							animator.EasePosition(dstPos, inputAnimateDuration);
+							animator.EaseColor(new Color(1, 1, 1, 0), inputAnimateDuration);
+							animator.DeclareConcurrentActionsEnd();
+							animator.CallFunc(() => input.gameObject.SetActive(false));
+							_inputFieldClosedCallback(result);
+							_inputActive = false;
 						}
-						break;
-				}
+					}
+				} while(false);
 			}
 		}
 
@@ -56,14 +92,25 @@ namespace FateUnity.Script.UI {
 		public void Hide() {
 			gameObject.SetActive(false);
 		}
-
+		
 		public void EnabledTextInput(Action<string> callback) {
-			_inputCallback = callback;
+			_inputFieldClosedCallback = callback;
 		}
 
 		public void DisableTextInput() {
-			input.Hide();
-			_inputCallback = null;
+			if (_inputActive) {
+				var dstPos = _inputAnimatePos - inputAnimatePositionOffset;
+				var animator = input.GetComponent<UIAnimator>();
+				animator.SkipAllActions();
+				animator.DeclareConcurrentActionsBegin();
+				animator.EasePosition(dstPos, inputAnimateDuration);
+				animator.EaseColor(new Color(1, 1, 1, 0), inputAnimateDuration);
+				animator.DeclareConcurrentActionsEnd();
+				animator.CallFunc(() => input.gameObject.SetActive(false));
+				if (_inputFieldClosedCallback != null) _inputFieldClosedCallback(null);
+				_inputActive = false;
+			}
+			_inputFieldClosedCallback = null;
 		}
 
 		public void DisplayText(string text) {

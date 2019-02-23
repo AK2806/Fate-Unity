@@ -4,10 +4,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using GameService.Util;
+using FateUnity.Components.UI;
 using FateUnity.Components.UI.Chat;
 
 public class PlayerStatus : MonoBehaviour {
 	public Image avatar;
+	public Image avatarGrayMask;
+	public Image lostConnectionIcon;
 	public Image progressBar;
 	public Text progressText;
 	public ChatBubble chatBubble;
@@ -24,7 +27,13 @@ public class PlayerStatus : MonoBehaviour {
 		
 	}
 
+	public void DisplayLostConnection(bool visible) {
+		avatarGrayMask.gameObject.SetActive(visible);
+		lostConnectionIcon.gameObject.SetActive(visible);
+	}
+
 	public void DisplayProgress(bool visible) {
+		avatarGrayMask.gameObject.SetActive(visible);
 		progressBar.gameObject.SetActive(visible);
 		progressText.gameObject.SetActive(visible);
 	}

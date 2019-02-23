@@ -8,45 +8,59 @@ using GameService.ClientComponent;
 namespace FateUnity.Components.UI {
 	public sealed class UIAnimator : MonoBehaviour {
 		private sealed class UIEasePosition : TimelineEaseAction {
-			private readonly RectTransform _ref;
-			private readonly Vector2 _from;
-			private readonly Vector2 _to;
+			private RectTransform _ref;
+			private Vector2 _from;
+			private Vector2 _to;
 
 			public UIEasePosition(RectTransform transform, Vector2 to, float duration, TimelineEaseType easeType) :
 				base(easeType, duration) {
 				_ref = transform;
-				_from = transform.anchoredPosition;
 				_to = to;
 			}
 
-			public override void Ease(float step) {
+			protected override TimelineEaseAction Copy(TimelineEaseType easeType, float duration) {
+				return new UIEasePosition(_ref, _to, duration, easeType);
+			}
+
+			protected override void Ease(float step) {
 				_ref.anchoredPosition = Vector2.Lerp(_from, _to, step);
 			}
 
-			public override void Final() {
+			protected override void Init() {
+				_from = _ref.anchoredPosition;
+			}
+
+			protected override void Final() {
 				_ref.anchoredPosition = _to;
 			}
 		}
 
 		private sealed class UIEaseRotation : TimelineEaseAction {
-			private readonly RectTransform _ref;
-			private readonly float _from;
-			private readonly float _to;
+			private RectTransform _ref;
+			private float _from;
+			private float _to;
 
 			public UIEaseRotation(RectTransform transform, float toAngle, float duration, TimelineEaseType easeType) :
 				base(easeType, duration)  {
 				_ref = transform;
-				_from = transform.eulerAngles.z;
 				_to = toAngle;
 			}
 
-			public override void Ease(float step) {
+			protected override TimelineEaseAction Copy(TimelineEaseType easeType, float duration) {
+				return new UIEaseRotation(_ref, _to, duration, easeType);
+			}
+
+			protected override void Ease(float step) {
 				var euler = _ref.eulerAngles;
 				euler.z = Mathf.Lerp(_from, _to, step);
 				_ref.eulerAngles = euler;
 			}
 
-			public override void Final() {
+			protected override void Init() {
+				_from = _ref.eulerAngles.z;
+			}
+
+			protected override void Final() {
 				var euler = _ref.eulerAngles;
 				euler.z = _to;
 				_ref.eulerAngles = euler;
@@ -54,22 +68,29 @@ namespace FateUnity.Components.UI {
 		}
 
 		private sealed class UIEaseScale : TimelineEaseAction {
-			private readonly RectTransform _ref;
-			private readonly Vector2 _from;
-			private readonly Vector2 _to;
+			private RectTransform _ref;
+			private Vector2 _from;
+			private Vector2 _to;
 
 			public UIEaseScale(RectTransform transform, Vector2 toScale, float duration, TimelineEaseType easeType) :
 				base(easeType, duration)  {
 				_ref = transform;
-				_from = transform.localScale;
 				_to = toScale;
 			}
 
-			public override void Ease(float step) {
+			protected override TimelineEaseAction Copy(TimelineEaseType easeType, float duration) {
+				return new UIEaseScale(_ref, _to, duration, easeType);
+			}
+
+			protected override void Ease(float step) {
 				_ref.localScale = Vector2.Lerp(_from, _to, step);
 			}
 
-			public override void Final() {
+			protected override void Init() {
+				_from = _ref.localScale;
+			}
+
+			protected override void Final() {
 				_ref.localScale = _to;
 			}
 		}
@@ -82,36 +103,50 @@ namespace FateUnity.Components.UI {
 			public UIEaseSize(RectTransform transform, Vector2 toSize, float duration, TimelineEaseType easeType) :
 				base(easeType, duration)  {
 				_ref = transform;
-				_from = transform.sizeDelta;
 				_to = toSize;
 			}
 
-			public override void Ease(float step) {
+			protected override TimelineEaseAction Copy(TimelineEaseType easeType, float duration) {
+				return new UIEaseSize(_ref, _to, duration, easeType);
+			}
+
+			protected override void Ease(float step) {
 				_ref.sizeDelta = Vector2.Lerp(_from, _to, step);
 			}
 
-			public override void Final() {
+			protected override void Init() {
+				_from = _ref.sizeDelta;
+			}
+
+			protected override void Final() {
 				_ref.sizeDelta = _to;
 			}
 		}
 
 		private sealed class UIGraphicEaseColor : TimelineEaseAction {
-			private readonly Graphic _ref;
-			private readonly Color _from;
-			private readonly Color _to;
+			private Graphic _ref;
+			private Color _from;
+			private Color _to;
 
 			public UIGraphicEaseColor(Graphic graphic, Color to, float duration, TimelineEaseType easeType) :
 				base(easeType, duration)  {
 				_ref = graphic;
-				_from = graphic.color;
 				_to = to;
 			}
 
-			public override void Ease(float step) {
+			protected override TimelineEaseAction Copy(TimelineEaseType easeType, float duration) {
+				return new UIGraphicEaseColor(_ref, _to, duration, easeType);
+			}
+
+			protected override void Ease(float step) {
 				_ref.color = Color.Lerp(_from, _to, step);
 			}
 
-			public override void Final() {
+			protected override void Init() {
+				_from = _ref.color;
+			}
+
+			protected override void Final() {
 				_ref.color = _to;
 			}
 		}
@@ -150,25 +185,40 @@ namespace FateUnity.Components.UI {
 		}
 
 		public void EaseColor(Color color, float duration, TimelineEaseType easeType = TimelineEaseType.Linear) {
-			var components = GetComponentsInChildren<Graphic>(true);
-			var cActions = new TimelineConcurrentActions();
-			foreach (var graphicComponent in components) {
-				var action = new UIGraphicEaseColor(graphicComponent, color, duration, easeType);
-				cActions.AddAction(action);
-			}
+			var graphicComp = GetComponent<Graphic>();
+			if (graphicComp == null) return;
+			var action = new UIGraphicEaseColor(graphicComp, color, duration, easeType);
 			if (_concurrentActions != null) {
-				_concurrentActions.AddAction(cActions);
+				_concurrentActions.AddAction(action);
 			} else {
-				_timeline.PushAction(cActions);
+				_timeline.PushAction(action);
+			}
+		}
+
+		public void Wait(float time) {
+			var action = new TimelineWaitAction(time);
+			if (_concurrentActions != null) {
+				_concurrentActions.AddAction(action);
+			} else {
+				_timeline.PushAction(action);
 			}
 		}
 
 		public void CallFunc(Action func) {
+			var action = new TimelineCallbackAction(func);
 			if (_concurrentActions != null) {
-				_concurrentActions.AddAction(new TimelineCallbackAction(func));
+				_concurrentActions.AddAction(action);
 			} else {
-				_timeline.PushAction(new TimelineCallbackAction(func));
+				_timeline.PushAction(action);
 			}
+		}
+
+		public void ResetAsSequenceMode(bool abort = false) {
+			_timeline.ResetAsSequenceMode(abort);
+		}
+
+		public void ResetAsRepeatMode(bool abort = false) {
+			_timeline.ResetAsRepeatMode(abort);
 		}
 
 		private void Update() {

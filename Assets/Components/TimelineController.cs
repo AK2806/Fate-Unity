@@ -8,6 +8,9 @@ namespace FateUnity.Components {
 	public sealed class Timeline {
 		private Queue<TimelineAction> _actions;
 		private TimelineAction _performingAction = null;
+		private bool _repeating;
+
+		public bool RepeatMode { get { return _repeating; } }
 
 		public Timeline() {
 			_actions = new Queue<TimelineAction>();
@@ -17,28 +20,47 @@ namespace FateUnity.Components {
 			_actions.Enqueue(action);
 		}
 
+		public void ResetAsRepeatMode(bool abort = false) {
+			if (abort) Abort(); else Skip();
+			_repeating = true;
+		}
+
+		public void ResetAsSequenceMode(bool abort = false) {
+			if (abort) Abort(); else Skip();
+			_repeating = false;
+		}
+
 		public void Abort() {
 			_performingAction = null;
 			_actions.Clear();
 		}
 
 		public void Skip() {
-			_performingAction.Final();
-			_performingAction = null;
-			while (_actions.Count > 0) {
-				var action = _actions.Dequeue();
-				action.Final();
+			if (_repeating) {
+				Abort();
+			} else {
+				if (_performingAction != null) {
+					_performingAction.Finalization();
+					_performingAction = null;
+				}
+				while (_actions.Count > 0) {
+					var action = _actions.Dequeue();
+					action.Initialization();
+					action.Finalization();
+				}
 			}
 		}
 
 		public void Update(float deltaTime) {
 			if (_actions.Count > 0 && _performingAction == null) {
 				_performingAction = _actions.Dequeue();
+				if (_repeating) _actions.Enqueue(_performingAction.Copy());
+				_performingAction.Initialization();
 			}
 			if (_performingAction != null) {
-				_performingAction.Action(deltaTime);
-				if (_performingAction.IsActionCompleted) {
-					_performingAction.Final();
+				_performingAction.NextStep(deltaTime);
+				if (_performingAction.IsCompleted) {
+					_performingAction.Finalization();
 					_performingAction = null;
 				}
 			}
@@ -62,17 +84,39 @@ namespace FateUnity.Components {
 	}
 	
 	public abstract class TimelineAction {
-		
-		private bool _actionCompleted = false;
+		private bool _initialized = false;
+		private bool _completed = false;
 
-		public bool IsActionCompleted { get { return _actionCompleted; } }
+		public bool IsInitialized { get { return _initialized; } }
+		public bool IsCompleted { get { return _completed; } }
 
-		protected void MarkComplete() {
-			_actionCompleted = true;
+		public void Initialization() {
+			if (!_initialized) {
+				Init();
+				_initialized = true;
+			}
 		}
 
-		public abstract void Action(float deltaTime);
-		public abstract void Final();
+		public void NextStep(float deltaTime) {
+			if (_initialized && !_completed) Step(deltaTime);
+		}
+
+		public void Finalization() {
+			if (_initialized) {
+				_completed = true;
+				Final();
+			}
+		}
+
+		public abstract TimelineAction Copy();
+		
+		protected void MarkComplete() {
+			_completed = true;
+		}
+
+		protected abstract void Init();
+		protected abstract void Step(float deltaTime);
+		protected abstract void Final();
 	}
 
 	public sealed class TimelineWaitAction : TimelineAction {
@@ -83,122 +127,97 @@ namespace FateUnity.Components {
 			_waitTime = time;
 		}
 
-		public override void Action(float deltaTime) {
+		public override TimelineAction Copy() {
+			return new TimelineWaitAction(_waitTime);
+		}
+
+		protected override void Init() { }
+
+		protected override void Step(float deltaTime) {
 			_time += deltaTime;
 			if (_time >= _waitTime) {
 				MarkComplete();
 			}
 		}
 
-		public override void Final() { }
+		protected override void Final() { }
 	}
 
 	public sealed class TimelineConcurrentActions : TimelineAction {
-		private readonly LinkedList<TimelineAction> _concurrentActions;
-
-		public TimelineConcurrentActions() {
-			_concurrentActions = new LinkedList<TimelineAction>();
-		}
-
-		public void ClearActions() {
-			_concurrentActions.Clear();
-		}
+		private readonly LinkedList<TimelineAction> _concurrentActions = new LinkedList<TimelineAction>();
+		private readonly LinkedList<TimelineAction> _completedActions = new LinkedList<TimelineAction>();
 
 		public void AddAction(TimelineAction action) {
 			_concurrentActions.AddLast(action);
 		}
 
-		public override void Action(float deltaTime) {
+		public override TimelineAction Copy() {
+			var ret = new TimelineConcurrentActions();
+			foreach (var action in _concurrentActions) {
+				ret.AddAction(action.Copy());
+			}
+			foreach (var action in _completedActions) {
+				ret.AddAction(action.Copy());
+			}
+			return ret;
+		}
+
+		protected override void Init() {
+			foreach (var action in _concurrentActions) {
+				action.Initialization();
+			}
+		}
+
+		protected override void Step(float deltaTime) {
 			var node = _concurrentActions.First;
 			while (node != null) {
 				var nextNode = node.Next;
 				var action = node.Value;
-				action.Action(deltaTime);
-				if (action.IsActionCompleted) {
-					action.Final();
+				action.NextStep(deltaTime);
+				if (action.IsCompleted) {
+					action.Finalization();
 					_concurrentActions.Remove(node);
+					_completedActions.AddLast(action);
 				}
 				node = nextNode;
 			}
-			if (_concurrentActions.Count == 0) MarkComplete();
+			if (_concurrentActions.Count <= 0) MarkComplete();
 		}
 
-		public override void Final() { }
-	}
-	
-	public sealed class TimelineRepeatActions : TimelineAction {
-		private readonly Queue<TimelineAction> _repeatActions;
-		private readonly int _repeatCount;
-		private TimelineAction _performingAction = null;
-		private TimelineAction _firstAction = null;
-		private int _repeatNumber = 0;
-
-		public TimelineRepeatActions(int repeatCount = -1) {
-			_repeatActions = new Queue<TimelineAction>();
-			_repeatCount = repeatCount;
-		}
-
-		public void ClearActions() {
-			_repeatActions.Clear();
-		}
-
-		public void StopRepeat() {
-			MarkComplete();
-		}
-
-		public void PushAction(TimelineAction action) {
-			_repeatActions.Enqueue(action);
-			if (_firstAction == null) _firstAction = action;
-		}
-
-		public override void Action(float deltaTime) {
-			if (_repeatActions.Count <= 0) {
-				MarkComplete();
-			} else {
-				if (_performingAction == null) {
-					_performingAction = _repeatActions.Dequeue();
-					_repeatActions.Enqueue(_performingAction);
-					if (_firstAction == _performingAction) {
-						++_repeatNumber;
-						if (_repeatNumber > _repeatCount) {
-							MarkComplete();
-							return;
-						}
-					}
-				}
-				if (_performingAction != null) {
-					_performingAction.Action(deltaTime);
-					if (_performingAction.IsActionCompleted) {
-						_performingAction.Final();
-						_performingAction = null;
-					}
-				}
+		protected override void Final() {
+			foreach (var action in _concurrentActions) {
+				action.Finalization();
+				_completedActions.AddLast(action);
 			}
+			_concurrentActions.Clear();
 		}
-
-		public override void Final() { }
 	}
 	
 	public sealed class TimelineCallbackAction : TimelineAction {
 		private readonly Action _callback;
 
+		public override TimelineAction Copy() {
+			return new TimelineCallbackAction(_callback);
+		}
+
 		public TimelineCallbackAction(Action callback) {
 			_callback = callback;
 		}
 
-		public override void Action(float deltaTime) {
+		protected override void Init() { }
+
+		protected override void Step(float deltaTime) {
+			_callback();
 			MarkComplete();
 		}
 
-		public override void Final() {
-			_callback();
-		}
+		protected override void Final() { }
 	}
 
 	public abstract class TimelineEaseAction : TimelineAction {
 		private const float Pi = 3.14159265359f, HalfPi = 1.57079632679f, TwoPi = 6.28318530718f;
 
-		private static float Step(TimelineEaseType esType, float t) {
+		private static float EsFunc(TimelineEaseType esType, float t) {
 			switch (esType) {
 				case TimelineEaseType.Quad:
 				case TimelineEaseType.QuadIn:       return t * t;
@@ -246,9 +265,9 @@ namespace FateUnity.Components {
 				case TimelineEaseType.ElasticInOut: return (t *= 2) < 1 ? (float)(-.5 * Math.Exp(7 * (t -= 1)) * Math.Sin((t - 0.1125) * 13.962634016)) : (float)(Math.Exp(-7 * (t -= 1)) * Math.Sin((t - 0.1125) * 13.962634016) * .5 + 1);
 				
 				case TimelineEaseType.Bounce:
-				case TimelineEaseType.BounceIn:     return 1 - Step(TimelineEaseType.BounceOut, 1 - t);
+				case TimelineEaseType.BounceIn:     return 1 - EsFunc(TimelineEaseType.BounceOut, 1 - t);
 				case TimelineEaseType.BounceOut:    return t < 0.363636363636f ? 7.5625f * t * t : t < 0.727272727273f ? 7.5625f * (t -= 0.545454545455f) * t + .75f : t < 0.909090909091f ? 7.5625f * (t -= 0.818181818182f) * t + .9375f : 7.5625f * (t -= 0.954545454545f) * t + .984375f;
-				case TimelineEaseType.BounceInOut:  return (t *= 2) < 1 ? .5f * (1 - Step(TimelineEaseType.BounceOut, 1 - t)) : .5f * (Step(TimelineEaseType.BounceOut, t - 1) + 1);
+				case TimelineEaseType.BounceInOut:  return (t *= 2) < 1 ? .5f * (1 - EsFunc(TimelineEaseType.BounceOut, 1 - t)) : .5f * (EsFunc(TimelineEaseType.BounceOut, t - 1) + 1);
 			}
 
 			return t;
@@ -256,24 +275,28 @@ namespace FateUnity.Components {
 
 		private readonly TimelineEaseType _easeType;
 		private readonly float _duration;
-		private float _time;
-		private float _step;
+		private float _time = 0.0f;
 		
 		public TimelineEaseAction(TimelineEaseType easeType, float duration) {
 			_easeType = easeType;
 			_duration = duration;
 		}
 
-		public sealed override void Action(float deltaTime) {
+		public override TimelineAction Copy() {
+			return Copy(_easeType, _duration);
+		}
+
+		protected sealed override void Step(float deltaTime) {
 			_time += deltaTime;
 			if (_time >= _duration) {
 				MarkComplete();
 			} else {
-				float step = Step(_easeType, _time / _duration);
+				float step = EsFunc(_easeType, _time / _duration);
 				Ease(step);
 			}
 		}
 
-		public abstract void Ease(float step);
+		protected abstract TimelineEaseAction Copy(TimelineEaseType easeType, float duration);
+		protected abstract void Ease(float step);
 	}
 }

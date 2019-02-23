@@ -25,18 +25,6 @@ public class Example : MonoBehaviour {
 
  	DefaultObjectListModel<DefaultListObject> model = new DefaultObjectListModel<DefaultListObject>();
 
-	IEnumerator TextAnimChange() {
-		int i = 9;
-		while (true) {
-			if (++i >= 10) {
-				i = 0;
-				text.text = "";
-			}
-			text.text += i;
-			yield return new WaitForSeconds(0.02f);
-		}
-	}
-
 	IEnumerator Test() {
 		float percent = 0.0f;
 		playerStatus.DisplayProgress(true);
@@ -145,9 +133,9 @@ public class Example : MonoBehaviour {
 		var testSprite = Res.CreateSprite(1);
 		image.sprite = testSprite;
 		image.SetNativeSize();
-		StartCoroutine(TextAnimChange());
 		StartCoroutine(Test());
 		playerStatus.ShowChatText("你好");
+		playerStatus.DisplayLostConnection(true);
 /*
 		selectionList.Show(new string[] {"左转", "右转", "什么都不做", "测试1", "测试2", "测试3"}, idx => Debug.Log(idx));
 		selectionList.ShowVoter(0, 0, testSprite, new Vector2(20, -236), 0.3f);
@@ -155,7 +143,7 @@ public class Example : MonoBehaviour {
 /*
 		diceGroup.DisplayPoints(new int[] {1, 0, -1, 0});
 		chatBubble.SetChatText("你好"); */
-		dialog.EnabledTextInput(text => Debug.Log(text));
+		dialog.EnabledTextInput(text => dialog.DisplayText(text ?? "<null>"));
 /*
 		var listView = Instantiate(listViewPrefab);
 		listView.BindModel(model);
